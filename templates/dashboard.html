@@ -1,0 +1,17 @@
+<!-- Add this inside the participant table loop in dashboard.html -->
+<td class="p-3">
+    <div class="flex gap-1 flex-wrap max-w-xs">
+        {% for i in range(1, 31) %}
+            {% set is_done = false %}
+            {% for resp in p.daily_responses %}
+                {% if resp.day == i %}{% set is_done = true %}{% endif %}
+            {% endfor %}
+            
+            {% if is_done %}
+                <div class="w-6 h-6 rounded bg-green-500 text-white text-xs flex items-center justify-center font-bold" title="Day {{ i }} Complete">{{ i }}</div>
+            {% else %}
+                <div class="w-6 h-6 rounded bg-gray-200 text-gray-400 text-xs flex items-center justify-center">{{ i }}</div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</td>

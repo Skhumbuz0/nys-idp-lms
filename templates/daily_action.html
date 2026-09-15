@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md border-t-4 border-blue-600">
+    <div class="mb-6 border-b pb-4">
+        <span class="text-sm font-bold text-blue-600 uppercase tracking-wide">Week {{ day_data.week }} • Day {{ day }}</span>
+        <h2 class="text-3xl font-bold text-gray-900 mt-2">{{ day_data.title }}</h2>
+    </div>
+
+    <form method="POST" action="/daily-action/{{ day }}" class="space-y-8" enctype="multipart/form-data">
+        <div class="bg-gray-50 p-4 rounded border">
+            <label class="block text-sm font-bold text-gray-700">Participant ID</label>
+            <input type="text" name="participant_id" placeholder="NYS-2026-0001" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500">
+        </div>
+
+        <!-- Dynamic Questions -->
+        {% for q in day_data.questions %}
+        <div class="border-b pb-6">
+            <label class="block text-lg font-semibold text-gray-800 mb-3">{{ q.label }}</label>
+            
+            {% if q.type == 'paragraph' or q.type == 'text' %}
+                <textarea name="q_{{ q.id }}" rows="3" required placeholder="{{ q.placeholder if q.placeholder else '' }}" class="w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-blue-500 focus:border-blue-500"></textarea>
+            
+            {% elif q.type == 'date' %}
+                <input type="date" name="q_{{ q.id }}" required class="w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500">
+            
+            {% elif q.type == 'scale' %}
+                <div class="flex flex-wrap gap-3 mt-2">
+                    {% for i in range(q.min, q.max + 1) %}
+                        <label class="flex flex-col items-center cursor-pointer bg-gray-100 hover:bg-blue-100 p-2 rounded transition">
+                            <input type="radio" name="q_{{ q.id }}" value="{{ i }}" required class="mb-1 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm font-bold">{{ i }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            
+            {% elif q.type == 'checkbox' %}
+                <div class="space-y-2 mt-2">
+                    {% for opt in q.options %}
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded">
+                            <input type="checkbox" name="q_{{ q.id }}" value="{{ opt }}" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+                            <span class="text-gray-700">{{ opt }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                
+            {% elif q.type == 'radio' %}
+                <div class="space-y-2 mt-2">
+                    {% for opt in q.options %}
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded">
+                            <input type="radio" name="q_{{ q.id }}" value="{{ opt }}" required class="text-blue-600 focus:ring-blue-500 h-4 w-4">
+                            <span class="text-gray-700">{{ opt }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+
+            {% elif q.type == 'file' %}
+                <input type="file" name="evidence_file" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- Action Section -->
+        <div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
+            <h3 class="text-xl font-bold text-blue-800 mb-3 flex items-center">🚀 ACTION</h3>
+            <p class="text-gray-800 mb-4 text-lg">Your action today: <strong class="text-blue-900">{{ day_data.action }}</strong></p>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Did you complete today's action?</label>
+            <div class="flex space-x-6">
+                <label class="flex items-center space-x-2 cursor-pointer"><input type="radio" name="action_status" value="Yes" required class="text-blue-600 focus:ring-blue-500 h-4 w-4"> <span class="font-medium">Yes</span></label>
+                <label class="flex items-center space-x-2 cursor-pointer"><input type="radio" name="action_status" value="Partially" class="text-blue-600 focus:ring-blue-500 h-4 w-4"> <span class="font-medium">Partially</span></label>
+                <label class="flex items-center space-x-2 cursor-pointer"><input type="radio" name="action_status" value="No" class="text-blue-600 focus:ring-blue-500 h-4 w-4"> <span class="font-medium">No</span></label>
+            </div>
+        </div>
+
+        <!-- Reflection Section -->
+        <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+            <h3 class="text-xl font-bold text-green-800 mb-3 flex items-center">🔄 REFLECTION</h3>
+            <label class="block text-sm font-bold text-gray-700 mb-2">{{ day_data.reflection }}</label>
+            <textarea name="reflection" rows="4" required class="w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-green-500 focus:border-green-500"></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-4 px-6 rounded-lg hover:bg-blue-700 transition shadow-lg text-lg flex justify-center items-center gap-2">
+            Submit & Move to Day {{ day + 1 if day < 30 else 'Dashboard' }} →
+        </button>
+    </form>
+</div>
+{% endblock %}

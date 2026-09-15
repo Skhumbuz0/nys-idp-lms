@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md text-center">
+    <h2 class="text-2xl font-bold text-green-600 mb-4">Registration Successful!</h2>
+    <p class="text-lg mb-2">Your Participant ID is:</p>
+    <p class="text-3xl font-bold text-blue-800 mb-6">{{ pid }}</p>
+    <p class="text-gray-600 mb-6">Save this ID. You will need it for all quizzes and daily actions.</p>
+    <a href="/daily-action/1" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700">Start Day 1</a>
+</div>
+{% endblock %}
