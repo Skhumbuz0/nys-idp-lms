@@ -352,7 +352,7 @@ def quiz_form(request: Request, week: int, db = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Week out of range")
     
     chapters = WEEK_INFO[week]["chapters"]
-    questions = db.query(Question).filter(Question.chapter.in_(chapters)).order_by(Question.chapter, Question.chapter_question_num).all()
+    questions = db.query(Question).filter(Question.chapter.in_(chapters)).order_by(Question.chapter, Question.id).all()
     
     return templates.TemplateResponse(request=request, name="quiz.html", context={
         "week": week, 
