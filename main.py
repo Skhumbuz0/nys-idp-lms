@@ -1,18 +1,23 @@
 # main.py
 import re
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from database import Base, engine, get_db
 from models import Participant, Question, QuizResponse, DailyResponse
 
 app = FastAPI(title="NYS IDP LMS")
-
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory=Path("templates"))
+
+# Admin password - change this to your own secret password
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "MAYO2026!")
 
 # ==========================================
 # THE 30-DAY CURRICULUM ENGINE
@@ -182,6 +187,13 @@ CURRICULUM = {
     ], "action": "Print or save your final commitment. The real work begins now.", "reflection": "Who have you become over the last 30 days?"}
 }
 
+WEEK_INFO = {
+    1: {"title": "Discover", "chapters": [1,2,3,4], "max_score": 60, "description": "Chapters 1-4: Introduction, Desire, Faith, Auto-Suggestion"},
+    2: {"title": "Build Mindset", "chapters": [5,6,7,8], "max_score": 60, "description": "Chapters 5-8: Specialized Knowledge, Imagination, Organized Planning, Decision"},
+    3: {"title": "Turn Ideas Into Plans", "chapters": [9,10,11,12], "max_score": 60, "description": "Chapters 9-12: Persistence, Master Mind, Sex Transmutation, Subconscious Mind"},
+    4: {"title": "Execute & Persist", "chapters": [13,14,15], "max_score": 45, "description": "Chapters 13-15: The Brain, The Sixth Sense, Six Ghosts of Fear"}
+}
+
 # ==========================================
 # UTILITIES
 # ==========================================
@@ -235,7 +247,7 @@ def update_participant_progress(db, participant_id: str):
     db.commit()
 
 # ==========================================
-# ROUTES (FIXED FOR STARLETTE 0.28+)
+# PUBLIC ROUTES
 # ==========================================
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
@@ -255,8 +267,139 @@ def process_register(request: Request, db = Depends(get_db), full_name: str = Fo
     db.add(new_p)
     db.commit()
     update_participant_progress(db, pid)
-    return templates.TemplateResponse(request=request, name="register_success.html", context={"pid": pid})
+    return templates.TemplateResponse(request=request, name="register_success.html", context={"pid": pid, "name": full_name})
 
+# ==========================================
+# LEARNER LOGIN SYSTEM
+# ==========================================
+@app.get("/login", response_class=HTMLResponse)
+def login_choice(request: Request):
+    return templates.TemplateResponse(request=request, name="login_choice.html", context={})
+
+@app.get("/login/learner", response_class=HTMLResponse)
+def learner_login_form(request: Request):
+    return templates.TemplateResponse(request=request, name="login.html", context={})
+
+@app.post("/login/learner")
+def process_learner_login(request: Request, db = Depends(get_db), participant_id: str = Form(...)):
+    pid = participant_id.strip().upper()
+    p = db.query(Participant).filter(Participant.participant_id == pid).first()
+    if not p:
+        return templates.TemplateResponse(request=request, name="login.html", context={"error": "Participant ID not found. Please check and try again."})
+    return templates.TemplateResponse(request=request, name="login_success.html", context={"pid": pid, "name": p.full_name})
+
+# ==========================================
+# FACILITATOR/ADMIN LOGIN SYSTEM
+# ==========================================
+@app.get("/login/facilitator", response_class=HTMLResponse)
+def facilitator_login_form(request: Request):
+    return templates.TemplateResponse(request=request, name="facilitator_login.html", context={})
+
+@app.post("/login/facilitator")
+def process_facilitator_login(request: Request, password: str = Form(...)):
+    if password.strip() == ADMIN_PASSWORD:
+        return templates.TemplateResponse(request=request, name="facilitator_login_success.html", context={})
+    return templates.TemplateResponse(request=request, name="facilitator_login.html", context={"error": "Incorrect password. Please try again."})
+
+@app.get("/logout", response_class=HTMLResponse)
+def logout(request: Request):
+    return templates.TemplateResponse(request=request, name="logout.html", context={})
+
+# ==========================================
+# LEARNER DASHBOARD
+# ==========================================
+@app.get("/my-progress", response_class=HTMLResponse)
+def my_progress(request: Request):
+    return templates.TemplateResponse(request=request, name="my_progress.html", context={})
+
+@app.get("/api/participant/{pid}")
+def get_participant_api(pid: str, db = Depends(get_db)):
+    p = db.query(Participant).filter(Participant.participant_id == pid.upper()).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    
+    quizzes = db.query(QuizResponse).filter(QuizResponse.participant_id == pid.upper()).all()
+    actions = db.query(DailyResponse).filter(DailyResponse.participant_id == pid.upper()).all()
+    
+    return {
+        "participant_id": p.participant_id,
+        "full_name": p.full_name,
+        "email": p.email,
+        "overall_progress_pct": p.overall_progress_pct or 0,
+        "overall_quiz_pct": p.overall_quiz_pct or 0,
+        "day30_action_progress_pct": p.day30_action_progress_pct or 0,
+        "day30_completed_days": p.day30_completed_days or 0,
+        "day30_current_streak": p.day30_current_streak or 0,
+        "risk_status": p.risk_status or "Not Started",
+        "week1_complete": p.week1_complete,
+        "week2_complete": p.week2_complete,
+        "week3_complete": p.week3_complete,
+        "week4_complete": p.week4_complete,
+        "quizzes": [{"week": q.week, "score": q.score, "max_score": q.max_score, "percentage": q.percentage} for q in quizzes],
+        "completed_days": sorted(list(set(a.day for a in actions)))
+    }
+
+# ==========================================
+# WEEKLY QUIZ HUB & ROUTES
+# ==========================================
+@app.get("/quizzes", response_class=HTMLResponse)
+def quiz_hub(request: Request, db = Depends(get_db)):
+    return templates.TemplateResponse(request=request, name="quiz_hub.html", context={"week_info": WEEK_INFO})
+
+@app.get("/quiz/{week}", response_class=HTMLResponse)
+def quiz_form(request: Request, week: int, db = Depends(get_db)):
+    if week < 1 or week > 4:
+        raise HTTPException(status_code=404, detail="Week out of range")
+    
+    chapters = WEEK_INFO[week]["chapters"]
+    questions = db.query(Question).filter(Question.chapter.in_(chapters)).order_by(Question.chapter, Question.chapter_question_num).all()
+    
+    return templates.TemplateResponse(request=request, name="quiz.html", context={
+        "week": week, 
+        "week_title": WEEK_INFO[week]["title"],
+        "week_description": WEEK_INFO[week]["description"],
+        "questions": questions
+    })
+
+@app.post("/quiz/{week}")
+async def process_quiz(week: int, request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    
+    p = db.query(Participant).filter(Participant.participant_id == pid).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Participant not found. Please register first.")
+        
+    chapters = WEEK_INFO[week]["chapters"]
+    max_score = WEEK_INFO[week]["max_score"]
+    
+    questions = db.query(Question).filter(Question.chapter.in_(chapters)).all()
+    
+    score = 0
+    for q in questions:
+        user_ans = str(form_data.get(f"q_{q.question_id}", "")).strip().lower()
+        if user_ans == str(q.correct_answer).strip().lower():
+            score += q.marks
+            
+    pct = (score / max_score * 100) if max_score > 0 else 0
+    
+    existing_quiz = db.query(QuizResponse).filter(QuizResponse.participant_id == pid, QuizResponse.week == week).first()
+    if existing_quiz:
+        existing_quiz.score = score
+        existing_quiz.max_score = max_score
+        existing_quiz.percentage = pct
+    else:
+        db.add(QuizResponse(participant_id=pid, week=week, score=score, max_score=max_score, percentage=pct))
+        
+    setattr(p, f"week{week}_complete", True)
+    db.commit()
+    
+    update_participant_progress(db, pid)
+    return RedirectResponse(url="/my-progress", status_code=303)
+
+# ==========================================
+# DAILY ACTION ROUTES
+# ==========================================
 @app.get("/daily-action", response_class=HTMLResponse)
 def daily_action_hub(request: Request, db = Depends(get_db)):
     return templates.TemplateResponse(request=request, name="daily_action_hub.html", context={"curriculum": CURRICULUM})
@@ -270,7 +413,7 @@ def daily_action_form(request: Request, day: int):
 @app.post("/daily-action/{day}")
 async def process_daily_action(day: int, request: Request, db = Depends(get_db)):
     form_data = await request.form()
-    pid = form_data.get("participant_id")
+    pid = str(form_data.get("participant_id", "")).strip().upper()
     
     responses = {}
     for key, value in form_data.items():
@@ -305,10 +448,13 @@ async def process_daily_action(day: int, request: Request, db = Depends(get_db))
     next_day = day + 1
     if next_day <= 30:
         return RedirectResponse(url=f"/daily-action/{next_day}", status_code=303)
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url="/my-progress", status_code=303)
 
-@app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, db = Depends(get_db)):
+# ==========================================
+# FACILITATOR DASHBOARD (Admin Only)
+# ==========================================
+@app.get("/facilitator", response_class=HTMLResponse)
+def facilitator_dashboard(request: Request, db = Depends(get_db)):
     total = db.query(Participant).count()
     completed = db.query(Participant).filter(Participant.final_idp_complete == True).count()
     
@@ -321,7 +467,7 @@ def dashboard(request: Request, db = Depends(get_db)):
     
     return templates.TemplateResponse(
         request=request, 
-        name="dashboard.html", 
+        name="facilitator_dashboard.html", 
         context={
             "total": total, 
             "completed": completed,
@@ -330,7 +476,282 @@ def dashboard(request: Request, db = Depends(get_db)):
         }
     )
 
+# ==========================================
+# INIT & SEED
+# ==========================================
+
 @app.get("/init-db")
 def init_db(db = Depends(get_db)):
     Base.metadata.create_all(bind=engine)
-    return {"message": "Database initialized and seeded successfully!"}
+    return {"message": "Database tables created successfully!"}
+@app.get("/seed-questions")
+def seed_questions(db = Depends(get_db)):
+    if db.query(Question).count() > 0:
+        return {"message": "Questions already seeded."}
+    
+    raw_questions = [
+        # === CHAPTER 1 — INTRODUCTION (15 questions) ===
+        (1, 1, "What was Edwin C. Barnes' definite objective?", "To become rich through mining", "To become Thomas Edison's business associate", "To become Edison's employee", "To invent a new machine", "b"),
+        (1, 2, "What did Barnes begin with?", "Large amounts of money", "A powerful family connection", "A definite purpose and determination", "A university qualification", "c"),
+        (1, 3, "What does the chapter use Barnes' story to demonstrate?", "Wealth comes mainly from luck", "Achievement begins with a definite idea and purpose", "Education guarantees success", "People must inherit wealth", "b"),
+        (1, 4, "What should a person do instead of simply wishing for success?", "Wait for an opportunity", "Define exactly what they want", "Avoid taking risks", "Find someone wealthy to support them", "b"),
+        (1, 5, "Barnes' circumstances at the beginning were described as:", "Extremely wealthy", "Comfortable", "Limited", "Powerful", "c"),
+        (1, 6, "What lesson does the chapter give about circumstances?", "Circumstances determine your future", "You should wait until circumstances improve", "You should determine what you can do despite circumstances", "Circumstances should be ignored completely", "c"),
+        (1, 7, "What did Barnes do when he could not immediately become Edison's business associate?", "He gave up", "He started his own university", "He found a way to get into Edison's organisation", "He borrowed money", "c"),
+        (1, 8, "What does the chapter teach about starting?", "Start only when everything is perfect", "Start wherever you can", "Start after becoming wealthy", "Start only after getting permission", "b"),
+        (1, 9, "What should a person look for inside a problem?", "Someone to blame", "An opportunity", "An excuse", "A shortcut", "b"),
+        (1, 10, "What is the lesson of 'Three Feet From Gold'?", "Gold is impossible to find", "Persistence can be defeated by quitting too soon", "Mining is the best business", "Luck determines success", "b"),
+        (1, 11, "Temporary defeat should be interpreted as:", "Permanent failure", "Evidence that the goal is impossible", "A temporary condition", "A reason to quit", "c"),
+        (1, 12, "According to the chapter, what can defeat often provide?", "An opportunity to learn", "Guaranteed wealth", "A reason to blame others", "A replacement for planning", "a"),
+        (1, 13, "What must accompany a definite purpose?", "Wishful thinking", "Action and persistence", "Fear", "Indecision", "b"),
+        (1, 14, "Barnes' example demonstrates the importance of:", "Waiting for perfect opportunities", "Taking the first practical step toward a definite objective", "Avoiding difficult situations", "Having wealthy parents", "b"),
+        (1, 15, "What is one of the central lessons of the Introduction?", "Think positively and do nothing", "Definite purpose must be translated into action", "Money is the only measure of success", "Education is unnecessary", "b"),
+
+        # === CHAPTER 2 — DESIRE (15 questions) ===
+        (2, 1, "What does Hill identify as the starting point of all achievement?", "Money", "Desire", "Education", "Luck", "b"),
+        (2, 2, "What should you state first when applying the six-step formula?", "Your favourite career", "The exact amount of money you desire", "Your biggest fear", "Your current income", "b"),
+        (2, 3, "What must you determine in addition to the amount of money?", "What you will give in return", "What other people earn", "Where you will live", "What university you attended", "a"),
+        (2, 4, "What should you establish regarding time?", "A vague future intention", "A definite date by which you intend to possess the money", "A retirement age", "A weekly holiday", "b"),
+        (2, 5, "What must you create for achieving the goal?", "A definite plan", "A dream board only", "A list of excuses", "A prediction", "a"),
+        (2, 6, "What should you do with your plan?", "Begin immediately", "Wait until next year", "Keep it secret forever", "Give it to someone else", "a"),
+        (2, 7, "What should be written down?", "Only the amount of money", "The complete statement of desire", "Other people's opinions", "Your past failures", "b"),
+        (2, 8, "How often does Hill instruct the reader to read the statement aloud?", "Once a week", "Once a month", "Twice daily", "Once a year", "c"),
+        (2, 9, "When should the statement be read?", "Morning and night", "Only at lunchtime", "Only on weekends", "Only when discouraged", "a"),
+        (2, 10, "What should you do while reading the statement?", "Memorise the words without emotion", "See and feel yourself already in possession of the money", "Compare yourself with others", "Ignore the goal", "b"),
+        (2, 11, "What else should you visualise?", "Yourself rendering the service or delivering the merchandise through which you intend to earn the money", "Someone giving you money", "Winning a lottery", "Avoiding work", "a"),
+        (2, 12, "Why is the 'in return' part important?", "Hill presents achievement as an exchange involving value", "Money has no connection to service", "It removes the need for planning", "It guarantees success", "a"),
+        (2, 13, "What is the difference between a wish and the desire described by Hill?", "Desire is vague", "Desire is backed by definiteness and a plan", "Desire requires no action", "Wish is more powerful", "b"),
+        (2, 14, "Which sequence best represents Hill's six-step process?", "Wish → wait → hope → receive", "Amount → exchange → deadline → plan → write → repeat/visualise", "Education → job → salary → retirement", "Money → spending → debt → wealth", "b"),
+        (2, 15, "What does Hill say should happen if you cannot yet see how the goal will be achieved?", "Abandon it", "Continue developing the desire and plan", "Lower the goal immediately", "Wait for someone else", "b"),
+
+        # === CHAPTER 3 — FAITH (15 questions) ===
+        (3, 1, "How does Hill define faith within his philosophy?", "Blind luck", "Visualization of and belief in attainment of desire", "Academic knowledge", "Financial planning", "b"),
+        (3, 2, "What should be combined with desire?", "Doubt", "Faith", "Fear", "Indifference", "b"),
+        (3, 3, "What role does visualization play?", "It helps create a mental picture of the desired outcome", "It replaces action", "It eliminates the need for knowledge", "It guarantees money", "a"),
+        (3, 4, "According to Hill, faith can be:", "Deliberately developed", "Purchased", "Inherited only", "Avoided", "a"),
+        (3, 5, "What should be added to repeated statements of desire?", "Emotion", "Confusion", "Fear", "Criticism", "a"),
+        (3, 6, "What does Hill say faith influences?", "The subconscious mind", "The weather", "Other people's decisions", "The stock market automatically", "a"),
+        (3, 7, "What should you picture yourself doing in relation to your goal?", "Already possessing the desired result", "Avoiding responsibility", "Waiting for someone else", "Giving up", "a"),
+        (3, 8, "Which combination is most consistent with Hill's approach?", "Desire + faith + emotion", "Fear + doubt + procrastination", "Money + luck + waiting", "Criticism + indecision + avoidance", "a"),
+        (3, 9, "Why does Hill emphasise emotion?", "He believes emotionally charged thoughts have greater influence on the subconscious", "Emotion removes the need for work", "Emotion guarantees wealth", "Emotion replaces specialised knowledge", "a"),
+        (3, 10, "What can weaken faith?", "Repeated doubt", "Definite purpose", "Persistence", "Constructive imagination", "a"),
+        (3, 11, "What should a person do when doubt appears?", "Strengthen belief through repeated constructive thought and action", "Abandon the goal", "Avoid planning", "Stop learning", "a"),
+        (3, 12, "Faith is presented as something that can be strengthened through:", "Practice", "Gambling", "Complaining", "Avoidance", "a"),
+        (3, 13, "What does Hill connect faith with in achieving desire?", "Turning desire into a mental certainty that supports action", "Avoiding action", "Eliminating knowledge", "Depending on luck", "a"),
+        (3, 14, "What should a person repeatedly focus on?", "The desired outcome", "Past mistakes only", "Other people's failures", "Fear", "a"),
+        (3, 15, "In Hill's framework, faith is primarily intended to help a person:", "Develop belief in the attainment of their definite desire", "Become dependent on others", "Avoid difficult decisions", "Stop making plans", "a"),
+
+        # === CHAPTER 4 — AUTO-SUGGESTION (15 questions) ===
+        (4, 1, "What does Hill describe auto-suggestion as?", "Self-suggestion", "Financial advice", "Physical exercise", "Formal education", "a"),
+        (4, 2, "Auto-suggestion is described as the agency of communication between:", "Conscious thought and the subconscious mind", "Two businesses", "Two universities", "Employer and employee", "a"),
+        (4, 3, "What kind of thoughts can influence the subconscious according to Hill?", "Dominating thoughts permitted to remain in the conscious mind", "Only thoughts written by other people", "Only academic thoughts", "No thoughts", "a"),
+        (4, 4, "What does Hill compare the subconscious mind to?", "A fertile garden", "A bank account", "A factory machine", "A classroom", "a"),
+        (4, 5, "What happens if desirable thoughts are not planted in the 'garden'?", "Undesirable thoughts may grow", "Nothing happens", "Wealth automatically appears", "Knowledge disappears", "a"),
+        (4, 6, "What does Hill instruct the reader to read aloud twice daily?", "Their written statement of desire", "Their CV", "A newspaper", "Their financial statement", "a"),
+        (4, 7, "What must accompany the words for auto-suggestion to be effective in Hill's framework?", "Emotion or feeling", "Anger", "Fear", "Silence", "a"),
+        (4, 8, "Merely repeating words without emotion is described as:", "Insufficient", "Guaranteed to work", "The only requirement", "More powerful than faith", "a"),
+        (4, 9, "What should a person deliberately feed the subconscious mind with?", "Constructive thoughts and desires", "Fear", "Jealousy", "Hatred", "a"),
+        (4, 10, "What should the conscious mind act as?", "An outer guard to what reaches the subconscious", "A source of money", "A replacement for imagination", "A source of fear", "a"),
+        (4, 11, "What is one purpose of repetition?", "To create thought habits", "To avoid planning", "To eliminate specialised knowledge", "To replace action", "a"),
+        (4, 12, "Which emotion does Hill encourage in relation to desire?", "Faith", "Hatred", "Jealousy", "Revenge", "a"),
+        (4, 13, "What does Hill say about negative thoughts?", "They can influence the subconscious if not controlled", "They are always harmless", "They should be encouraged", "They guarantee persistence", "a"),
+        (4, 14, "What is the practical application of auto-suggestion in the course?", "Repeatedly and emotionally reinforce a definite purpose", "Stop thinking about goals", "Avoid writing goals", "Wait for circumstances to change", "a"),
+        (4, 15, "Which statement best captures the chapter?", "Repeated, emotional thought can influence the subconscious and develop thought habits", "Money appears through repetition alone", "Planning is unnecessary", "Knowledge has no value", "a"),
+
+        # === CHAPTER 5 — SPECIALIZED KNOWLEDGE (15 questions) ===
+        (5, 1, "What type of knowledge does Hill say is important for success?", "Specialized knowledge", "Every possible fact", "General gossip", "Unused information", "a"),
+        (5, 2, "What is the difference between general and specialized knowledge?", "Specialized knowledge is organised around a specific purpose or field", "General knowledge is always useless", "Specialized knowledge cannot be learned", "There is no difference", "a"),
+        (5, 3, "Does Hill say a person must personally possess all knowledge required for a major undertaking?", "No", "Yes, always", "Only if they are wealthy", "Only if they are young", "a"),
+        (5, 4, "What can a person do when they lack specialised knowledge?", "Acquire it or organise people who possess it", "Abandon the goal", "Pretend to know it", "Ignore the gap", "a"),
+        (5, 5, "What should knowledge ultimately be converted into?", "Plans and action", "Certificates only", "Arguments", "Entertainment", "a"),
+        (5, 6, "Why is knowledge alone insufficient?", "It must be organised and applied toward a definite purpose", "Knowledge has no value", "It prevents imagination", "It creates fear", "a"),
+        (5, 7, "Where can specialised knowledge come from?", "Education, experience and other knowledgeable people", "Luck only", "Money only", "Dreams only", "a"),
+        (5, 8, "What should you do when you identify a knowledge gap?", "Determine where the required knowledge can be obtained", "Ignore it", "Blame someone", "Give up", "a"),
+        (5, 9, "Which is an example of specialised knowledge?", "Technical knowledge needed to perform a specific task", "Random facts with no application", "Rumours", "Unverified opinions", "a"),
+        (5, 10, "What role can other people play in filling knowledge gaps?", "They can provide knowledge and experience you do not possess", "They prevent learning", "They eliminate planning", "They guarantee wealth", "a"),
+        (5, 11, "What should specialised knowledge support?", "Your definite purpose", "Procrastination", "Fear", "Indecision", "a"),
+        (5, 12, "What does Hill emphasise about education?", "Education should help a person acquire and use useful knowledge", "Formal education automatically creates wealth", "Education is unnecessary", "Certificates are the same as specialised knowledge", "a"),
+        (5, 13, "What should you do with knowledge once acquired?", "Organise it into practical plans", "Hide it", "Forget it", "Use it only for conversation", "a"),
+        (5, 14, "Which person is better prepared to pursue a specialised goal?", "Someone who identifies and fills their knowledge gaps", "Someone who refuses to learn", "Someone who relies entirely on luck", "Someone who avoids experts", "a"),
+        (5, 15, "What is the key lesson of the chapter?", "You need the right knowledge, whether acquired personally or through others, and must organise it for action", "You must know everything yourself", "General information guarantees wealth", "Learning should stop after school", "a"),
+
+        # === CHAPTER 6 — IMAGINATION (15 questions) ===
+        (6, 1, "What does Hill call imagination?", "The workshop of the mind", "A form of financial accounting", "A type of education", "A business licence", "a"),
+        (6, 2, "What can imagination combine?", "Existing knowledge and ideas", "Only money", "Only emotions", "Only memories", "a"),
+        (6, 3, "What can imagination be used to create?", "Plans and solutions", "Fear", "Debt", "Excuses", "a"),
+        (6, 4, "What is one purpose of creative imagination?", "To create new combinations of existing ideas", "To avoid thinking", "To replace specialised knowledge completely", "To eliminate action", "a"),
+        (6, 5, "What should you do when an idea occurs to you?", "Capture and examine it", "Immediately forget it", "Assume it is impossible", "Hide it", "a"),
+        (6, 6, "What can imagination help transform?", "Thought into practical plans", "Money into knowledge automatically", "Fear into wealth automatically", "Failure into success without action", "a"),
+        (6, 7, "Which activity exercises imagination?", "Generating several possible solutions to a problem", "Repeating the same idea without thinking", "Avoiding problems", "Waiting for someone else", "a"),
+        (6, 8, "Why is imagination important to entrepreneurship?", "Entrepreneurs must create new combinations and solutions", "Entrepreneurs do not need ideas", "It eliminates customers", "It replaces all knowledge", "a"),
+        (6, 9, "What should imagination ultimately contribute to?", "Useful ideas and plans", "Confusion", "Procrastination", "Fear", "a"),
+        (6, 10, "What should you do with an idea that appears promising?", "Develop and test it", "Assume it will work automatically", "Ignore it", "Wait indefinitely", "a"),
+        (6, 11, "What is one way to develop imagination?", "Deliberately practise generating solutions", "Avoid new experiences", "Stop learning", "Avoid problems", "a"),
+        (6, 12, "What is a 'new combination' in the context of imagination?", "Combining existing knowledge or concepts in a new way", "Memorising a fact", "Copying an idea without change", "Avoiding creativity", "a"),
+        (6, 13, "What does imagination need to become useful?", "Direction and application", "No purpose", "No knowledge", "No action", "a"),
+        (6, 14, "What should a person ask when facing a problem?", "What different solutions can I create?", "Who can I blame?", "Why should I quit?", "How can I avoid thinking?", "a"),
+        (6, 15, "What is the central lesson of the chapter?", "Ideas can be developed through imagination and organised into useful plans", "Imagination is only entertainment", "Ideas have no economic value", "Imagination replaces persistence", "a"),
+
+        # === CHAPTER 7 — ORGANIZED PLANNING (15 questions) ===
+        (7, 1, "What does organized planning do to desire?", "Crystallizes desire into action", "Eliminates desire", "Delays action", "Replaces desire with fear", "a"),
+        (7, 2, "What should a practical plan contain?", "Definite steps toward the objective", "Vague wishes", "Excuses", "Predictions only", "a"),
+        (7, 3, "Who should you ally with when necessary?", "A group of people needed to create and carry out the plan", "Nobody", "Only competitors", "Only strangers", "a"),
+        (7, 4, "What principle does Hill connect to this group?", "Master Mind", "Six Ghosts", "Auto-Suggestion", "Sixth Sense", "a"),
+        (7, 5, "What should you determine before forming the Master Mind?", "What benefits you can offer members", "How to control members", "How to avoid cooperation", "How to work alone", "a"),
+        (7, 6, "How often does Hill suggest the group meet while perfecting the plan?", "At least twice a week", "Once a year", "Once a month", "Never", "a"),
+        (7, 7, "What must exist among Master Mind members?", "Harmony", "Competition", "Distrust", "Fear", "a"),
+        (7, 8, "What should happen to plans that do not work?", "Replace them with new plans", "Abandon the goal immediately", "Blame others", "Hide the failure", "a"),
+        (7, 9, "What does Hill identify as a major reason people fail with plans?", "Lack of persistence in creating new plans", "Too much learning", "Too much cooperation", "Too many ideas", "a"),
+        (7, 10, "Why should other minds contribute to a plan?", "They bring experience, education, ability and knowledge", "They remove responsibility", "They guarantee success", "They replace the leader", "a"),
+        (7, 11, "What should happen to plans developed by an individual?", "They should be checked and approved by the Master Mind when applicable", "They should never be questioned", "They should be hidden", "They should be abandoned", "a"),
+        (7, 12, "What is the relationship between planning and persistence?", "Failed plans should be replaced rather than causing abandonment of the goal", "Failed plans mean the goal is impossible", "Planning eliminates persistence", "Persistence means never changing a plan", "a"),
+        (7, 13, "What should compensation for cooperation be?", "It may take forms other than money", "It must always be cash", "It should never exist", "It is unnecessary", "a"),
+        (7, 14, "What is the purpose of organised planning?", "To translate desire into practical action", "To create more wishes", "To postpone decisions", "To avoid people", "a"),
+        (7, 15, "What is one of the chapter's most important lessons?", "Do not abandon the goal simply because the first plan fails", "Never change a plan", "Work alone", "Avoid criticism", "a"),
+
+        # === CHAPTER 8 — DECISION (15 questions) ===
+        (8, 1, "What does Hill identify as an important characteristic of successful people?", "Prompt decision-making", "Indecision", "Procrastination", "Avoidance", "a"),
+        (8, 2, "What should decisions generally be made?", "Promptly", "After endless discussion", "Only when someone else decides", "Never", "a"),
+        (8, 3, "What should changes to decisions generally be?", "Slow and deliberate", "Immediate and emotional", "Random", "Avoided completely", "a"),
+        (8, 4, "What is one enemy of decision?", "Procrastination", "Knowledge", "Planning", "Persistence", "a"),
+        (8, 5, "What should a person do before making an important decision?", "Quietly gather relevant facts", "Ask everyone for approval", "Ignore evidence", "Wait forever", "a"),
+        (8, 6, "Who should have access to sensitive plans and decisions?", "Trusted members of the Master Mind", "Everyone", "Strangers", "Competitors", "a"),
+        (8, 7, "What should criticism from others do to your definite purpose?", "It should not automatically control your direction", "It should always change your goal", "It should stop all action", "It should determine your career", "a"),
+        (8, 8, "What does procrastination mean in this context?", "Delaying decisions or action unnecessarily", "Planning carefully", "Gathering facts", "Learning", "a"),
+        (8, 9, "What should a person do once sufficient information has been gathered?", "Decide and act", "Keep researching forever", "Ask everyone else to decide", "Abandon the goal", "a"),
+        (8, 10, "Which behaviour demonstrates indecision?", "Passing responsibility to others", "Making a considered decision", "Taking responsibility", "Acting on a plan", "a"),
+        (8, 11, "Why does Hill emphasise prompt decisions?", "Indecision can create delay and weaken action", "Facts are unnecessary", "Planning is unnecessary", "Mistakes are impossible", "a"),
+        (8, 12, "What should a person avoid when making decisions?", "Allowing fear and outside criticism to dominate the decision", "Gathering facts", "Thinking independently", "Consulting trusted people", "a"),
+        (8, 13, "What does the chapter encourage?", "Independent thinking", "Blind conformity", "Endless waiting", "Avoidance", "a"),
+        (8, 14, "Once a decision has been made, what should follow?", "Action", "Another year of hesitation", "Excuses", "Fear", "a"),
+        (8, 15, "The title 'Mastery of Procrastination' suggests mastery over:", "Unnecessary delay", "Education", "Imagination", "Cooperation", "a"),
+
+        # === CHAPTER 9 — PERSISTENCE (15 questions) ===
+        (9, 1, "What does Hill say about persistence?", "It is a state of mind that can be cultivated", "It is impossible to develop", "It depends only on luck", "It is inherited", "a"),
+        (9, 2, "Which factor is listed first among the eight causes of persistence?", "Definiteness of purpose", "Money", "Fame", "Age", "a"),
+        (9, 3, "Why does desire support persistence?", "Strong desire motivates continued effort", "Desire eliminates work", "Desire guarantees success", "Desire removes the need for planning", "a"),
+        (9, 4, "What does self-reliance contribute to persistence?", "Belief in one's ability to carry out a plan", "Dependence on others", "Fear of failure", "Indecision", "a"),
+        (9, 5, "What type of plans encourage persistence?", "Definite plans", "Secret plans with no action", "Vague plans", "No plans", "a"),
+        (9, 6, "What does accurate knowledge provide?", "Confidence that plans are based on sound information", "Guaranteed wealth", "An excuse to stop learning", "Fear", "a"),
+        (9, 7, "What type of cooperation supports persistence?", "Sympathy, understanding and harmonious cooperation", "Conflict", "Competition within the team", "Distrust", "a"),
+        (9, 8, "What does willpower involve?", "Concentrating thoughts on building plans for a definite purpose", "Avoiding decisions", "Depending on luck", "Ignoring goals", "a"),
+        (9, 9, "What does Hill call the direct result of habit?", "Persistence", "Wealth", "Fear", "Knowledge", "a"),
+        (9, 10, "What should a person do to understand their own persistence?", "Take an honest inventory of themselves", "Compare themselves with everyone else", "Ignore weaknesses", "Avoid self-analysis", "a"),
+        (9, 11, "Which is a symptom of lack of persistence?", "Procrastination", "Definite purpose", "Self-reliance", "Accurate knowledge", "a"),
+        (9, 12, "Which is another symptom of lack of persistence?", "Indecision", "Planning", "Desire", "Cooperation", "a"),
+        (9, 13, "What does Hill recommend when a plan fails?", "Continue by developing another plan", "Abandon the goal", "Blame circumstances", "Stop learning", "a"),
+        (9, 14, "How can fear be weakened according to the chapter?", "Through repeated acts of courage", "Through avoidance", "Through procrastination", "Through indecision", "a"),
+        (9, 15, "What is the central lesson of persistence?", "Continue sustained effort toward a definite purpose despite temporary setbacks", "Never change plans", "Never experience failure", "Depend on motivation alone", "a"),
+
+        # === CHAPTER 10 — POWER OF THE MASTER MIND (15 questions) ===
+        (10, 1, "What is the Master Mind based upon?", "Coordinated knowledge and effort of two or more people", "Working completely alone", "Competition", "Financial wealth only", "a"),
+        (10, 2, "Why does Hill believe people need a Master Mind?", "No individual possesses all the experience and knowledge needed for every major undertaking", "People cannot think independently", "It eliminates responsibility", "It guarantees success", "a"),
+        (10, 3, "What should the group have?", "A definite objective", "No objective", "Conflicting objectives", "Secret objectives", "a"),
+        (10, 4, "What is essential to a successful Master Mind?", "Harmony", "Fear", "Jealousy", "Distrust", "a"),
+        (10, 5, "What can members contribute?", "Knowledge, experience, skills, contacts and ideas", "Only money", "Only criticism", "Nothing", "a"),
+        (10, 6, "What happens when minds work together harmoniously?", "Their combined effort can create greater power than isolated effort", "Individual responsibility disappears", "Plans become unnecessary", "Fear increases automatically", "a"),
+        (10, 7, "What should members gain from participating?", "Mutual benefit", "Nothing", "Guaranteed wealth", "Control over others", "a"),
+        (10, 8, "What should a leader do when assembling a Master Mind?", "Identify the people whose knowledge and abilities are needed", "Choose people randomly", "Avoid skilled people", "Select only people who agree with everything", "a"),
+        (10, 9, "What is the Master Mind not simply about?", "Having many friends", "Combining useful minds around a definite purpose", "Cooperation", "Shared knowledge", "a"),
+        (10, 10, "Why is harmony important?", "Conflict can destroy the cooperative power of the group", "Harmony guarantees money", "Harmony removes the need for action", "Harmony replaces planning", "a"),
+        (10, 11, "What should the Master Mind help transform?", "Knowledge into organised action", "Action into procrastination", "Plans into fear", "Desire into indecision", "a"),
+        (10, 12, "Who benefits from a properly organised Master Mind?", "All participating members", "Only the leader", "Only the wealthiest person", "Nobody", "a"),
+        (10, 13, "What should members bring to the relationship?", "Useful contribution", "Passive dependence", "Competition", "Secrecy", "a"),
+        (10, 14, "What does the Master Mind strengthen?", "Collective problem-solving and organised effort", "Isolation", "Indecision", "Fear", "a"),
+        (10, 15, "What is the central lesson?", "Combine capable people around a definite purpose and work in harmony", "Success must always be achieved alone", "Knowledge is unnecessary", "Teams eliminate responsibility", "a"),
+
+        # === CHAPTER 11 — SEX TRANSMUTATION (15 questions) ===
+        (11, 1, "What does Hill mean by 'transmutation' in this chapter?", "Changing or redirecting energy from one form into another", "Eliminating desire", "Avoiding creativity", "Removing emotion", "a"),
+        (11, 2, "Which emotion does Hill describe as a powerful stimulus to the mind?", "Sex", "Indifference", "Boredom", "Laziness", "a"),
+        (11, 3, "What does Hill suggest this energy can be redirected toward?", "Creative and constructive activities", "Procrastination", "Destruction", "Indifference", "a"),
+        (11, 4, "Which is included among Hill's ten mind stimuli?", "Love", "Laziness", "Confusion", "Indifference", "a"),
+        (11, 5, "Which is another mind stimulus listed by Hill?", "Music", "Boredom", "Sleep", "Silence", "a"),
+        (11, 6, "What does Hill include as a mind stimulus involving cooperation?", "Master Mind alliance", "Isolation", "Competition", "Conflict", "a"),
+        (11, 7, "Which substance does Hill include among the mind stimuli?", "Narcotics and alcohol", "Water", "Food", "Vitamins", "a"),
+        (11, 8, "How does Hill distinguish constructive and destructive stimuli?", "He identifies some stimuli as constructive and others as destructive", "All stimuli are constructive", "All stimuli are destructive", "None influence the mind", "a"),
+        (11, 9, "What does Hill associate sex transmutation with?", "Creative ability", "Procrastination", "Indecision", "Poverty", "a"),
+        (11, 10, "What does Hill say strong emotion can stimulate?", "Creative imagination and action", "Laziness", "Indifference", "Fear only", "a"),
+        (11, 11, "According to Hill, what should strong motivational energy be used for?", "Constructive achievement", "Destructive behaviour", "Avoiding goals", "Giving up", "a"),
+        (11, 12, "What role does imagination play in Hill's framework?", "It helps direct powerful impulses into creative purposes", "It prevents creativity", "It eliminates desire", "It replaces specialised knowledge", "a"),
+        (11, 13, "Which of these is NOT one of Hill's listed mind stimuli?", "Love", "Music", "Friendship", "Procrastination", "d"),
+        (11, 14, "What is the practical lesson that can be extracted from the chapter for this course?", "Channel strong motivation and energy into constructive goals", "Suppress all emotion", "Avoid ambition", "Stop creating", "a"),
+        (11, 15, "Hill presents sex transmutation primarily as a method of:", "Redirecting powerful emotion toward constructive achievement", "Avoiding relationships", "Eliminating desire", "Replacing planning", "a"),
+
+        # === CHAPTER 12 — THE SUBCONSCIOUS MIND (15 questions) ===
+        (12, 1, "How does Hill describe the subconscious mind?", "A connecting link between the conscious mind and what he calls Infinite Intelligence", "A financial institution", "A physical muscle", "A form of formal education", "a"),
+        (12, 2, "Does Hill say the subconscious mind remains idle?", "No", "Yes", "Only during sleep", "Only during work", "a"),
+        (12, 3, "What happens if desirable thoughts are not deliberately planted?", "The subconscious can be influenced by thoughts that reach it through other sources", "Nothing happens", "The mind stops functioning", "Knowledge disappears", "a"),
+        (12, 4, "Which emotions does Hill encourage?", "Desire, faith, love, enthusiasm and hope", "Fear, hatred and revenge", "Jealousy and anger", "Indifference", "a"),
+        (12, 5, "Which emotions does Hill identify as negative?", "Fear, jealousy, hatred and anger", "Hope and enthusiasm", "Love and faith", "Desire and romance", "a"),
+        (12, 6, "What should dominate the subconscious mind?", "Constructive thoughts and definite desires", "Fear", "Poverty consciousness", "Revenge", "a"),
+        (12, 7, "What role does persistence play?", "It helps establish thought habits", "It eliminates imagination", "It replaces desire", "It prevents learning", "a"),
+        (12, 8, "What should thoughts be mixed with according to Hill?", "Feeling or emotion", "Confusion", "Fear", "Indifference", "a"),
+        (12, 9, "What does Hill say everything man creates begins as?", "A thought impulse", "Money", "A physical object", "A business", "a"),
+        (12, 10, "What does imagination do to thought impulses?", "It can assemble them into plans", "It destroys them", "It prevents action", "It removes desire", "a"),
+        (12, 11, "What should a person do with negative mental impulses?", "Work to control and replace them with more desirable thoughts", "Encourage them", "Ignore them completely", "Turn them into excuses", "a"),
+        (12, 12, "What does Hill connect with influencing the subconscious voluntarily?", "Habit", "Luck", "Wealth", "Age", "a"),
+        (12, 13, "What is one reason Hill repeatedly emphasises a written desire?", "To make the desire clear and repeatedly impress it upon the mind", "To replace action", "To avoid planning", "To impress other people", "a"),
+        (12, 14, "What should the subconscious be 'fed' with?", "Desirable, constructive thoughts", "Fear", "Jealousy", "Hatred", "a"),
+        (12, 15, "What is the practical lesson of the chapter?", "Deliberately cultivate the thoughts and emotions that support your definite purpose", "Stop thinking about your goal", "Depend entirely on the subconscious", "Avoid emotion", "a"),
+
+        # === CHAPTER 13 — THE BRAIN (15 questions) ===
+        (13, 1, "How does Hill describe the brain?", "A broadcasting and receiving station for thought", "A financial institution", "A computer in the modern technical sense", "A storage bank for money", "a"),
+        (13, 2, "What does Hill believe the brain can receive?", "Thought impulses", "Money", "Physical products", "Qualifications", "a"),
+        (13, 3, "What can stimulate the mind?", "Books, knowledgeable people, discussion and experience", "Isolation only", "Procrastination", "Fear", "a"),
+        (13, 4, "Why should people associate with capable thinkers?", "Their ideas and knowledge can stimulate your own thinking", "They guarantee wealth", "They eliminate responsibility", "They replace imagination", "a"),
+        (13, 5, "What can discussion with knowledgeable people produce?", "New ideas and solutions", "Guaranteed money", "Fear", "Indecision", "a"),
+        (13, 6, "What does Hill encourage people to develop?", "Creative imagination", "Passive thinking", "Indifference", "Isolation", "a"),
+        (13, 7, "What role can the brain play in the Master Mind principle?", "It can contribute to collective thinking and exchange of ideas", "It eliminates teamwork", "It replaces planning", "It removes knowledge", "a"),
+        (13, 8, "What should a person expose their mind to?", "Useful and stimulating information", "Negative influences only", "Fear", "Gossip", "a"),
+        (13, 9, "What can research provide?", "Information useful for solving problems and creating plans", "Guaranteed success", "Automatic wealth", "Elimination of risk", "a"),
+        (13, 10, "What is the relationship between knowledge and imagination?", "Knowledge can provide material for imagination to work with", "They are unrelated", "Knowledge prevents imagination", "Imagination eliminates knowledge", "a"),
+        (13, 11, "What should a person do when facing a difficult problem?", "Think, research and discuss possible solutions", "Avoid it", "Blame others", "Give up", "a"),
+        (13, 12, "What type of people should you seek out?", "People whose knowledge can contribute to your development", "People who discourage you", "People who always agree", "People who avoid learning", "a"),
+        (13, 13, "What can collective thinking help produce?", "New combinations of knowledge and ideas", "Less knowledge", "Automatic money", "Procrastination", "a"),
+        (13, 14, "Hill's 'broadcasting and receiving' description should be understood in this course as:", "Part of Hill's philosophical framework", "An established modern scientific law", "A computer networking protocol", "A financial principle", "a"),
+        (13, 15, "What is the practical lesson for participants?", "Feed your mind with quality knowledge and engage with capable thinkers", "Avoid learning from others", "Work entirely alone", "Stop developing imagination", "a"),
+
+        # === CHAPTER 14 — THE SIXTH SENSE (15 questions) ===
+        (14, 1, "What does Hill call the Sixth Sense?", "Creative imagination", "Physical strength", "Financial knowledge", "Memory", "a"),
+        (14, 2, "When does Hill say the Sixth Sense becomes more accessible?", "After mastering the preceding principles", "Before learning anything", "Without any effort", "Only through money", "a"),
+        (14, 3, "What can the Sixth Sense provide according to Hill's framework?", "Hunches, inspiration and ideas", "Guaranteed financial returns", "Perfect predictions", "Freedom from all risk", "a"),
+        (14, 4, "What should a person do with an idea or hunch?", "Examine and test it", "Automatically believe it", "Ignore every idea", "Treat it as guaranteed truth", "a"),
+        (14, 5, "What mental faculty is particularly important to the Sixth Sense?", "Creative imagination", "Procrastination", "Fear", "Indifference", "a"),
+        (14, 6, "What should precede reliance on the Sixth Sense?", "Development and application of the earlier principles", "Ignorance", "Indecision", "Avoidance", "a"),
+        (14, 7, "What does Hill suggest can emerge during quiet reflection?", "Ideas and inspiration", "Guaranteed wealth", "Other people's thoughts", "Perfect certainty", "a"),
+        (14, 8, "What are 'Invisible Counselors'?", "Imagined advisers based on admired people", "Government officials", "Financial institutions", "Actual employees", "a"),
+        (14, 9, "Why might someone use the Invisible Counselors exercise?", "To stimulate imagination and seek imagined guidance from admired figures", "To replace real mentors permanently", "To avoid decisions", "To guarantee success", "a"),
+        (14, 10, "What should a person do with useful inspiration?", "Convert it into constructive action", "Ignore it", "Wait indefinitely", "Hide it", "a"),
+        (14, 11, "What can interfere with the Sixth Sense according to Hill?", "Indecision, doubt and fear", "Knowledge", "Persistence", "Desire", "a"),
+        (14, 12, "What should participants do with intuitive ideas in a modern practical application?", "Test them against evidence and reality", "Accept every hunch as fact", "Reject every idea", "Stop researching", "a"),
+        (14, 13, "What is the Sixth Sense connected to?", "Creative imagination and inspiration", "Physical strength", "Financial accounting", "Formal qualifications", "a"),
+        (14, 14, "What is the purpose of mastering the earlier principles?", "To prepare the mind for the higher level of thinking Hill describes", "To eliminate planning", "To eliminate knowledge", "To avoid action", "a"),
+        (14, 15, "What is the safest practical interpretation for the NYS course?", "Develop intuition and creativity, then test ideas before acting", "Treat every feeling as fact", "Stop gathering evidence", "Depend entirely on intuition", "a"),
+
+        # === CHAPTER 15 — HOW TO OUTWIT THE SIX GHOSTS OF FEAR (15 questions) ===
+        (15, 1, "What are the 'Six Ghosts of Fear'?", "Six major fears identified by Hill", "Six business competitors", "Six financial strategies", "Six types of imagination", "a"),
+        (15, 2, "Which is the first fear listed by Hill?", "Fear of poverty", "Fear of education", "Fear of success", "Fear of travel", "a"),
+        (15, 3, "Which fear concerns what other people think?", "Fear of criticism", "Fear of old age", "Fear of death", "Fear of ill health", "a"),
+        (15, 4, "Which fear concerns physical wellbeing?", "Fear of ill health", "Fear of criticism", "Fear of poverty", "Fear of old age", "a"),
+        (15, 5, "Which fear concerns relationships?", "Fear of loss of love", "Fear of poverty", "Fear of death", "Fear of criticism", "a"),
+        (15, 6, "Which fear concerns getting older?", "Fear of old age", "Fear of criticism", "Fear of poverty", "Fear of ill health", "a"),
+        (15, 7, "Which fear concerns mortality?", "Fear of death", "Fear of criticism", "Fear of poverty", "Fear of loss of love", "a"),
+        (15, 8, "Which three negative forces does Hill place at the beginning of the chapter?", "Indecision, doubt and fear", "Desire, faith and hope", "Knowledge, imagination and planning", "Love, enthusiasm and romance", "a"),
+        (15, 9, "According to Hill, what is the relationship between indecision, doubt and fear?", "Indecision can develop into doubt, which blends into fear", "They are completely unrelated", "Fear creates knowledge", "Doubt creates persistence", "a"),
+        (15, 10, "What should participants do when studying the six fears?", "Examine themselves honestly to identify which fears may be affecting them", "Ignore them", "Blame others", "Pretend they do not exist", "a"),
+        (15, 11, "What does Hill call these fears?", "Ghosts", "Opportunities", "Principles", "Assets", "a"),
+        (15, 12, "Why does Hill call them 'ghosts'?", "He presents them as creations of the mind rather than physical beings", "They only occur at night", "They are supernatural creatures", "They are financial problems", "a"),
+        (15, 13, "What can fear contribute to?", "Discouragement, procrastination and indecision", "Guaranteed success", "Better planning automatically", "Specialised knowledge", "a"),
+        (15, 14, "What should a person replace worry with?", "Constructive decision and action", "More worry", "Avoidance", "Blame", "a"),
+        (15, 15, "What is the overall purpose of the chapter?", "Identify and overcome the fears that interfere with purposeful action", "Eliminate all risk from life", "Avoid making decisions", "Stop pursuing goals", "a"),
+    ]
+    
+    for ch, qn, q, a, b, c, d, corr in raw_questions:
+        correct_text = {"a": a, "b": b, "c": c, "d": d}[corr.lower()]
+        db.add(Question(
+            question_id=f"Q{ch}-{str(qn).zfill(2)}", chapter=ch, chapter_question_num=qn,
+            question_text=q, option_a=a, option_b=b, option_c=c, option_d=d,
+            correct_answer=corr, correct_answer_text=correct_text, marks=1
+        ))
+    db.commit()
+    return {"message": f"Successfully seeded {len(raw_questions)} questions!"}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md text-center">
+    <div class="text-5xl mb-4">👋</div>
+    <h2 class="text-2xl font-bold text-gray-800 mb-2">Logging Out...</h2>
+    <p class="text-gray-600">See you soon!</p>
+</div>
+
+<script>
+    localStorage.removeItem('nys_role');
+    localStorage.removeItem('nys_participant_id');
+    localStorage.removeItem('nys_participant_name');
+    setTimeout(() => { window.location.href = "/"; }, 1500);
+</script>
+{% endblock %}

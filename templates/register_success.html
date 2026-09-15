@@ -1,10 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md text-center">
-    <h2 class="text-2xl font-bold text-green-600 mb-4">Registration Successful!</h2>
-    <p class="text-lg mb-2">Your Participant ID is:</p>
-    <p class="text-3xl font-bold text-blue-800 mb-6">{{ pid }}</p>
-    <p class="text-gray-600 mb-6">Save this ID. You will need it for all quizzes and daily actions.</p>
-    <a href="/daily-action/1" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 transition">Start Day 1</a>
+<div class="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md text-center border-t-4 border-green-500">
+    <div class="text-6xl mb-4">🎉</div>
+    <h2 class="text-2xl font-bold text-green-600 mb-2">Registration Successful!</h2>
+    <p class="text-gray-600 mb-6">Welcome to the 30-Day Challenge, <strong>{{ name }}</strong>!</p>
+    
+    <!-- BIG PROMINENT ID DISPLAY -->
+    <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-6 mb-6">
+        <p class="text-sm text-gray-600 mb-2 uppercase font-bold tracking-wide">Your Participant ID</p>
+        <p class="text-4xl font-bold text-blue-800 font-mono mb-4" id="pid-display">{{ pid }}</p>
+        <p class="text-xs text-red-600 mb-4">⚠️ Save this ID! You'll need it to log in and track your progress.</p>
+        <button onclick="copyPid()" class="bg-blue-600 text-white font-bold py-2 px-6 rounded hover:bg-blue-700 transition">
+            📋 Copy ID to Clipboard
+        </button>
+    </div>
+
+    <div class="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6 text-left">
+        <p class="font-bold text-yellow-800 mb-2">📧 Check Your Email</p>
+        <p class="text-sm text-yellow-700">We've also sent your Participant ID to your email address for safekeeping.</p>
+    </div>
+
+    <div class="space-y-3">
+        <button onclick="loginAndContinue()" class="w-full bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 transition shadow-lg">
+            ✅ Save ID & Start Day 1 →
+        </button>
+        <a href="/login" class="block w-full bg-gray-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-gray-700 transition text-center">
+            I already have an ID — Login Instead
+        </a>
+    </div>
 </div>
+
+<script>
+    function copyPid() {
+        const pid = "{{ pid }}";
+        navigator.clipboard.writeText(pid).then(() => {
+            alert("✅ Participant ID copied: " + pid);
+        });
+    }
+    
+    function loginAndContinue() {
+        // Save to browser storage so app remembers you
+        localStorage.setItem('nys_participant_id', "{{ pid }}");
+        localStorage.setItem('nys_participant_name', "{{ name }}");
+        // Redirect to Day 1
+        window.location.href = "/daily-action/1";
+    }
+</script>
 {% endblock %}

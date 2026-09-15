@@ -8,42 +8,76 @@
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans flex flex-col min-h-screen">
     
-    <!-- Navigation Bar -->
     <nav class="bg-gray-900 text-white p-4 shadow-md">
         <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             
-            <!-- MAYO Logo & App Name Section -->
             <div class="flex items-center gap-3">
-                <!-- ⚠️ IMPORTANT: Replace the 'src' URL below with your actual MAYO logo image URL -->
-                <img src="https://imgur.com/a/kX42tbQ" 
-                     alt="MAYO Logo" 
-                     class="h-10 w-auto bg-white rounded p-1 shadow-sm">
-                
-                <!-- Vertical Divider (hidden on mobile) -->
+                <img src="/static/mayo-logo.png" alt="MAYO Logo" class="h-10 w-auto bg-white rounded p-1 shadow-sm" onerror="this.style.display='none'">
                 <div class="h-8 w-px bg-gray-600 hidden sm:block"></div>
-                
                 <h1 class="text-lg font-bold text-gray-100">NYS IDP — Think & Grow Rich</h1>
             </div>
             
-            <!-- Navigation Links -->
-            <div class="flex space-x-4 text-sm sm:text-base">
-                <a href="/" class="hover:text-blue-300 transition">Home</a>
-                <a href="/register" class="hover:text-blue-300 transition">Register</a>
-                <a href="/daily-action" class="hover:text-blue-300 transition">Daily Action</a>
-                <a href="/dashboard" class="hover:text-yellow-400 font-semibold transition">Dashboard</a>
+            <!-- LEARNER NAVIGATION -->
+            <div id="learner-nav" class="hidden flex flex-wrap justify-center gap-4 text-sm sm:text-base">
+                <a href="/" class="hover:text-blue-300 transition">🏠 Home</a>
+                <a href="/daily-action" class="hover:text-blue-300 transition">🎯 Daily Action</a>
+                <a href="/quizzes" class="hover:text-purple-300 font-semibold transition">📘 Weekly Quizzes</a>
+                <a href="/my-progress" class="hover:text-green-300 font-semibold transition">📊 My Progress</a>
+                <a href="/logout" class="hover:text-red-300 transition">🚪 Logout</a>
             </div>
+            
+            <!-- FACILITATOR NAVIGATION -->
+            <div id="facilitator-nav" class="hidden flex flex-wrap justify-center gap-4 text-sm sm:text-base">
+                <a href="/" class="hover:text-blue-300 transition">🏠 Home</a>
+                <a href="/facilitator" class="hover:text-yellow-400 font-semibold transition">📋 Facilitator Dashboard</a>
+                <a href="/logout" class="hover:text-red-300 transition">🚪 Logout</a>
+            </div>
+            
+            <!-- GUEST NAVIGATION -->
+            <div id="guest-nav" class="flex flex-wrap justify-center gap-4 text-sm sm:text-base">
+                <a href="/" class="hover:text-blue-300 transition">🏠 Home</a>
+                <a href="/register" class="hover:text-blue-300 transition">📝 Register</a>
+                <a href="/quizzes" class="hover:text-purple-300 transition">📘 Weekly Quizzes</a>
+                <a href="/login" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded transition font-semibold">🔑 Login</a>
+            </div>
+        </div>
+        
+        <!-- User Banner -->
+        <div id="user-banner" class="hidden container mx-auto mt-3 bg-blue-800 text-white px-4 py-2 rounded text-sm">
+            <span id="role-badge" class="bg-blue-600 px-2 py-1 rounded text-xs font-bold mr-2"></span>
+            Welcome, <strong id="user-name-display"></strong> 
+            <span class="ml-2 bg-blue-600 px-2 py-1 rounded font-mono text-xs" id="user-id-display"></span>
         </div>
     </nav>
 
-    <!-- Main Content Area -->
     <main class="container mx-auto p-6 flex-grow">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
     <footer class="bg-gray-900 text-gray-400 text-center p-4 text-sm mt-auto border-t border-gray-800">
         <p>&copy; 2026 MAYO. All rights reserved. | NYS IDP Learning Management System</p>
     </footer>
 
+    <script>
+        const role = localStorage.getItem('nys_role');
+        const savedPid = localStorage.getItem('nys_participant_id');
+        const savedName = localStorage.getItem('nys_participant_name');
+        
+        if (role === 'learner' && savedPid) {
+            document.getElementById('learner-nav').classList.remove('hidden');
+            document.getElementById('user-banner').classList.remove('hidden');
+            document.getElementById('role-badge').textContent = 'LEARNER';
+            document.getElementById('user-id-display').textContent = savedPid;
+            if (savedName) document.getElementById('user-name-display').textContent = savedName;
+        } else if (role === 'facilitator') {
+            document.getElementById('facilitator-nav').classList.remove('hidden');
+            document.getElementById('user-banner').classList.remove('hidden');
+            document.getElementById('role-badge').textContent = 'FACILITATOR';
+            document.getElementById('user-name-display').textContent = 'Admin';
+            document.getElementById('user-id-display').style.display = 'none';
+        } else {
+            document.getElementById('guest-nav').classList.remove('hidden');
+        }
+    </script>
 </body>
 </html>

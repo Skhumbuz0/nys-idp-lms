@@ -1,12 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="text-center py-20">
+<div class="text-center py-12">
     <h2 class="text-4xl font-bold text-gray-900 mb-4">NYS IDP — Think & Grow Rich</h2>
-    <p class="text-xl text-gray-600 mb-8">30-Day Challenge Learning Management System</p>
-    <div class="flex justify-center gap-4 flex-wrap">
-        <a href="/register" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition">Register Now</a>
-        <a href="/daily-action" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 transition">Daily Action</a>
-        <a href="/dashboard" class="bg-gray-800 text-white font-bold py-3 px-8 rounded-lg hover:bg-gray-900 transition">Facilitator Dashboard</a>
+    <p class="text-xl text-gray-600 mb-4">30-Day Challenge Learning Management System</p>
+    <p class="text-gray-500 mb-10">Transform your mindset. Build your future. Take action every day.</p>
+    
+    <div class="flex justify-center gap-4 flex-wrap mb-12">
+        <a href="/register" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition shadow-lg">📝 Register Now</a>
+        <a href="/quizzes" class="bg-purple-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-purple-700 transition shadow-lg">📘 Weekly Quizzes</a>
+        <a href="/login" class="bg-gray-800 text-white font-bold py-3 px-8 rounded-lg hover:bg-gray-900 transition shadow-lg">🔑 Login</a>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-500">
+            <div class="text-4xl mb-3">🎯</div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">30 Daily Actions</h3>
+            <p class="text-gray-600 text-sm">Complete one meaningful action every day to build momentum and transform your life.</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-purple-500">
+            <div class="text-4xl mb-3">📘</div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">4 Weekly Quizzes</h3>
+            <p class="text-gray-600 text-sm">Test your knowledge of "Think and Grow Rich" across 15 powerful chapters.</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-green-500">
+            <div class="text-4xl mb-3">📊</div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Personal Progress</h3>
+            <p class="text-gray-600 text-sm">Track your journey with real-time progress, streaks, and risk monitoring.</p>
+        </div>
     </div>
 </div>
 {% endblock %}

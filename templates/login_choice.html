@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold text-gray-900 mb-2">Welcome! How would you like to login?</h2>
+        <p class="text-gray-600">Choose your role to continue</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-8">
+        <!-- LEARNER LOGIN CARD -->
+        <a href="/login/learner" class="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-t-8 border-blue-500">
+            <div class="p-8">
+                <div class="text-6xl mb-4">🎓</div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition">I'm a Participant</h3>
+                <p class="text-gray-600 mb-6">Login with your Participant ID to access your 30-Day Challenge, track your progress, and take weekly quizzes.</p>
+                <ul class="text-sm text-gray-500 space-y-2 mb-6">
+                    <li>✅ Access Daily Actions</li>
+                    <li>✅ Take Weekly Quizzes</li>
+                    <li>✅ View Your Personal Progress</li>
+                    <li>✅ Track Your 30-Day Streak</li>
+                </ul>
+                <div class="bg-blue-50 text-blue-700 font-bold py-3 px-6 rounded-lg text-center group-hover:bg-blue-600 group-hover:text-white transition">
+                    Login as Participant →
+                </div>
+            </div>
+        </a>
+
+        <!-- FACILITATOR LOGIN CARD -->
+        <a href="/login/facilitator" class="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-t-8 border-yellow-500">
+            <div class="p-8">
+                <div class="text-6xl mb-4">👨‍🏫</div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2 group-hover:text-yellow-600 transition">I'm a Facilitator</h3>
+                <p class="text-gray-600 mb-6">Login with your facilitator password to monitor all participants, view risk reports, and manage the programme.</p>
+                <ul class="text-sm text-gray-500 space-y-2 mb-6">
+                    <li>✅ View All Participants</li>
+                    <li>✅ Monitor Risk Status</li>
+                    <li>✅ Track Programme Progress</li>
+                    <li>✅ Access Facilitator Dashboard</li>
+                </ul>
+                <div class="bg-yellow-50 text-yellow-700 font-bold py-3 px-6 rounded-lg text-center group-hover:bg-yellow-500 group-hover:text-white transition">
+                    Login as Facilitator →
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="text-center mt-10">
+        <p class="text-gray-600">Don't have an account yet?</p>
+        <a href="/register" class="text-blue-600 font-bold hover:underline text-lg">Register as a new participant →</a>
+    </div>
+</div>
+{% endblock %}
