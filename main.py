@@ -1,3 +1,4 @@
+# main.py
 import re
 import json
 from pathlib import Path
@@ -11,7 +12,6 @@ from models import Participant, Question, QuizResponse, DailyResponse
 
 app = FastAPI(title="NYS IDP LMS")
 
-# FIX: Use Path object and explicit keyword arguments to prevent Jinja2 caching errors
 templates = Jinja2Templates(directory=Path("templates"))
 
 # ==========================================
@@ -235,15 +235,15 @@ def update_participant_progress(db, participant_id: str):
     db.commit()
 
 # ==========================================
-# ROUTES
+# ROUTES (FIXED FOR STARLETTE 0.28+)
 # ==========================================
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse(name="home.html", context={"request": request})
+    return templates.TemplateResponse(request=request, name="home.html", context={})
 
 @app.get("/register", response_class=HTMLResponse)
 def register_form(request: Request):
-    return templates.TemplateResponse(name="register.html", context={"request": request})
+    return templates.TemplateResponse(request=request, name="register.html", context={})
 
 @app.post("/register")
 def process_register(request: Request, db = Depends(get_db), full_name: str = Form(...), email: str = Form(...), phone: str = Form(""), age_range: str = Form(...), main_goal: str = Form(...)):
@@ -255,17 +255,17 @@ def process_register(request: Request, db = Depends(get_db), full_name: str = Fo
     db.add(new_p)
     db.commit()
     update_participant_progress(db, pid)
-    return templates.TemplateResponse(name="register_success.html", context={"request": request, "pid": pid})
+    return templates.TemplateResponse(request=request, name="register_success.html", context={"pid": pid})
 
 @app.get("/daily-action", response_class=HTMLResponse)
 def daily_action_hub(request: Request, db = Depends(get_db)):
-    return templates.TemplateResponse(name="daily_action_hub.html", context={"request": request, "curriculum": CURRICULUM})
+    return templates.TemplateResponse(request=request, name="daily_action_hub.html", context={"curriculum": CURRICULUM})
 
 @app.get("/daily-action/{day}", response_class=HTMLResponse)
 def daily_action_form(request: Request, day: int):
     if day < 1 or day > 30:
         raise HTTPException(status_code=404, detail="Day out of range")
-    return templates.TemplateResponse(name="daily_action.html", context={"request": request, "day": day, "day_data": CURRICULUM[day]})
+    return templates.TemplateResponse(request=request, name="daily_action.html", context={"day": day, "day_data": CURRICULUM[day]})
 
 @app.post("/daily-action/{day}")
 async def process_daily_action(day: int, request: Request, db = Depends(get_db)):
@@ -320,9 +320,9 @@ def dashboard(request: Request, db = Depends(get_db)):
     participants.sort(key=lambda x: priority.get(x.risk_status, 6))
     
     return templates.TemplateResponse(
+        request=request, 
         name="dashboard.html", 
         context={
-            "request": request, 
             "total": total, 
             "completed": completed,
             "risk_dict": risk_dict, 
