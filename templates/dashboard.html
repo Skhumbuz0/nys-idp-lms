@@ -1,17 +1,68 @@
-<!-- Add this inside the participant table loop in dashboard.html -->
-<td class="p-3">
-    <div class="flex gap-1 flex-wrap max-w-xs">
-        {% for i in range(1, 31) %}
-            {% set is_done = false %}
-            {% for resp in p.daily_responses %}
-                {% if resp.day == i %}{% set is_done = true %}{% endif %}
-            {% endfor %}
-            
-            {% if is_done %}
-                <div class="w-6 h-6 rounded bg-green-500 text-white text-xs flex items-center justify-center font-bold" title="Day {{ i }} Complete">{{ i }}</div>
-            {% else %}
-                <div class="w-6 h-6 rounded bg-gray-200 text-gray-400 text-xs flex items-center justify-center">{{ i }}</div>
-            {% endif %}
-        {% endfor %}
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center mb-8">
+    <h2 class="text-3xl font-bold text-gray-900">Facilitator Dashboard</h2>
+    <p class="text-gray-500">Real-time participant tracking and risk monitoring</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+        <h3 class="text-gray-500 text-sm font-bold uppercase">Total Registered</h3>
+        <p class="text-3xl font-bold text-gray-900">{{ total }}</p>
     </div>
-</td>
+    <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+        <h3 class="text-gray-500 text-sm font-bold uppercase">Completed Programme</h3>
+        <p class="text-3xl font-bold text-gray-900">{{ completed }}</p>
+    </div>
+    <div class="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
+        <h3 class="text-gray-500 text-sm font-bold uppercase">At Risk</h3>
+        <p class="text-3xl font-bold text-red-600">{{ risk_dict.get('At Risk', 0) }}</p>
+    </div>
+    <div class="bg-white p-6 rounded-lg shadow border-l-4 border-yellow-500">
+        <h3 class="text-gray-500 text-sm font-bold uppercase">Needs Attention</h3>
+        <p class="text-3xl font-bold text-yellow-600">{{ risk_dict.get('Needs Attention', 0) }}</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="bg-gray-800 text-white p-4 font-bold text-lg">📊 PARTICIPANT OVERVIEW</div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-gray-100 text-gray-700 uppercase">
+                <tr>
+                    <th class="p-3">ID</th>
+                    <th class="p-3">Name</th>
+                    <th class="p-3">Quiz %</th>
+                    <th class="p-3">Action %</th>
+                    <th class="p-3">Overall %</th>
+                    <th class="p-3">Risk Status</th>
+                    <th class="p-3">Last Activity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in participants %}
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3 font-mono text-xs">{{ p.participant_id }}</td>
+                    <td class="p-3 font-medium">{{ p.full_name }}</td>
+                    <td class="p-3">{{ "%.1f"|format(p.overall_quiz_pct or 0) }}%</td>
+                    <td class="p-3">{{ "%.1f"|format(p.day30_action_progress_pct or 0) }}%</td>
+                    <td class="p-3 font-bold">{{ "%.1f"|format(p.overall_progress_pct or 0) }}%</td>
+                    <td class="p-3">
+                        {% if p.risk_status == 'At Risk' %}
+                            <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">{{ p.risk_status }}</span>
+                        {% elif p.risk_status == 'Needs Attention' %}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold">{{ p.risk_status }}</span>
+                        {% elif p.risk_status == 'On Track' %}
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">{{ p.risk_status }}</span>
+                        {% else %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-bold">{{ p.risk_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-3 text-gray-500 text-xs">{{ p.last_activity.strftime('%Y-%m-%d') if p.last_activity else 'Never' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

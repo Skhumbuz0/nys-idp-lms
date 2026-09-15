@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
-    <h2 class="text-2xl font-bold mb-6 text-gray-800">30-Day Challenge</h2>
+<div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-2 text-gray-800">30-Day Challenge</h2>
     <p class="text-gray-600 mb-6">Select a day to begin or continue your journey:</p>
-    <div class="grid grid-cols-5 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {% for day_num, day_data in curriculum.items() %}
         <a href="/daily-action/{{ day_num }}" class="bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-3 text-center transition">
-            <div class="text-xs text-blue-600 font-bold">W{{ day_data.week }}</div>
-            <div class="text-lg font-bold text-gray-800">{{ day_num }}</div>
-            <div class="text-xs text-gray-500 truncate">{{ day_data.title }}</div>
+            <div class="text-xs text-blue-600 font-bold">Week {{ day_data.week }}</div>
+            <div class="text-lg font-bold text-gray-800">Day {{ day_num }}</div>
+            <div class="text-xs text-gray-500 truncate mt-1">{{ day_data.title }}</div>
         </a>
         {% endfor %}
     </div>

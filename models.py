@@ -1,5 +1,5 @@
-﻿# models.py
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+﻿from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
 
@@ -36,6 +36,8 @@ class Participant(Base):
     day30_action_progress_pct = Column(Float, default=0.0)
     day30_completed_days = Column(Integer, default=0)
     day30_current_streak = Column(Integer, default=0)
+    
+    daily_responses = relationship("DailyResponse", back_populates="participant")
 
 class Question(Base):
     __tablename__ = "questions"
@@ -65,8 +67,10 @@ class DailyResponse(Base):
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
     day = Column(Integer)
-    responses_json = Column(String) # Stores dynamic form answers as JSON string
-    action_status = Column(String)  # Yes, Partially, No
+    responses_json = Column(String)
+    action_status = Column(String)
     reflection = Column(String)
     evidence_file = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    participant = relationship("Participant", back_populates="daily_responses")

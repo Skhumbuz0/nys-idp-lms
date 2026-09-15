@@ -1,5 +1,4 @@
-﻿# database.py
-import os
+﻿import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 

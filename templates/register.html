@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Programme Registration</h2>
+    <form method="POST" action="/register" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Full Name</label>
+            <input type="text" name="full_name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Email Address</label>
+            <input type="email" name="email" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Phone Number</label>
+            <input type="text" name="phone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Age Range</label>
+            <select name="age_range" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                <option>Under 18</option><option>18–24</option><option>25–34</option><option>35–44</option><option>45+</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Main Development Goal</label>
+            <textarea name="main_goal" rows="3" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"></textarea>
+        </div>
+        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">Register</button>
+    </form>
+</div>
+{% endblock %}
