@@ -486,9 +486,14 @@ def init_db(db = Depends(get_db)):
     return {"message": "Database tables created successfully!"}
 @app.get("/seed-questions")
 def seed_questions(db = Depends(get_db)):
-    if db.query(Question).count() > 0:
-        return {"message": "Questions already seeded."}
+    # If we already have 200+ questions, the bank is full
+    if db.query(Question).count() >= 200:
+        return {"message": "Question bank is already fully populated with 225 questions!"}
     
+    # Clear any partial/incomplete seeds to prevent duplicates
+    db.query(Question).delete()
+    
+    # ALL 225 QUESTIONS
     raw_questions = [
         # === CHAPTER 1 — INTRODUCTION (15 questions) ===
         (1, 1, "What was Edwin C. Barnes' definite objective?", "To become rich through mining", "To become Thomas Edison's business associate", "To become Edison's employee", "To invent a new machine", "b"),
@@ -506,7 +511,6 @@ def seed_questions(db = Depends(get_db)):
         (1, 13, "What must accompany a definite purpose?", "Wishful thinking", "Action and persistence", "Fear", "Indecision", "b"),
         (1, 14, "Barnes' example demonstrates the importance of:", "Waiting for perfect opportunities", "Taking the first practical step toward a definite objective", "Avoiding difficult situations", "Having wealthy parents", "b"),
         (1, 15, "What is one of the central lessons of the Introduction?", "Think positively and do nothing", "Definite purpose must be translated into action", "Money is the only measure of success", "Education is unnecessary", "b"),
-
         # === CHAPTER 2 — DESIRE (15 questions) ===
         (2, 1, "What does Hill identify as the starting point of all achievement?", "Money", "Desire", "Education", "Luck", "b"),
         (2, 2, "What should you state first when applying the six-step formula?", "Your favourite career", "The exact amount of money you desire", "Your biggest fear", "Your current income", "b"),
@@ -523,7 +527,6 @@ def seed_questions(db = Depends(get_db)):
         (2, 13, "What is the difference between a wish and the desire described by Hill?", "Desire is vague", "Desire is backed by definiteness and a plan", "Desire requires no action", "Wish is more powerful", "b"),
         (2, 14, "Which sequence best represents Hill's six-step process?", "Wish → wait → hope → receive", "Amount → exchange → deadline → plan → write → repeat/visualise", "Education → job → salary → retirement", "Money → spending → debt → wealth", "b"),
         (2, 15, "What does Hill say should happen if you cannot yet see how the goal will be achieved?", "Abandon it", "Continue developing the desire and plan", "Lower the goal immediately", "Wait for someone else", "b"),
-
         # === CHAPTER 3 — FAITH (15 questions) ===
         (3, 1, "How does Hill define faith within his philosophy?", "Blind luck", "Visualization of and belief in attainment of desire", "Academic knowledge", "Financial planning", "b"),
         (3, 2, "What should be combined with desire?", "Doubt", "Faith", "Fear", "Indifference", "b"),
@@ -540,7 +543,6 @@ def seed_questions(db = Depends(get_db)):
         (3, 13, "What does Hill connect faith with in achieving desire?", "Turning desire into a mental certainty that supports action", "Avoiding action", "Eliminating knowledge", "Depending on luck", "a"),
         (3, 14, "What should a person repeatedly focus on?", "The desired outcome", "Past mistakes only", "Other people's failures", "Fear", "a"),
         (3, 15, "In Hill's framework, faith is primarily intended to help a person:", "Develop belief in the attainment of their definite desire", "Become dependent on others", "Avoid difficult decisions", "Stop making plans", "a"),
-
         # === CHAPTER 4 — AUTO-SUGGESTION (15 questions) ===
         (4, 1, "What does Hill describe auto-suggestion as?", "Self-suggestion", "Financial advice", "Physical exercise", "Formal education", "a"),
         (4, 2, "Auto-suggestion is described as the agency of communication between:", "Conscious thought and the subconscious mind", "Two businesses", "Two universities", "Employer and employee", "a"),
@@ -557,7 +559,6 @@ def seed_questions(db = Depends(get_db)):
         (4, 13, "What does Hill say about negative thoughts?", "They can influence the subconscious if not controlled", "They are always harmless", "They should be encouraged", "They guarantee persistence", "a"),
         (4, 14, "What is the practical application of auto-suggestion in the course?", "Repeatedly and emotionally reinforce a definite purpose", "Stop thinking about goals", "Avoid writing goals", "Wait for circumstances to change", "a"),
         (4, 15, "Which statement best captures the chapter?", "Repeated, emotional thought can influence the subconscious and develop thought habits", "Money appears through repetition alone", "Planning is unnecessary", "Knowledge has no value", "a"),
-
         # === CHAPTER 5 — SPECIALIZED KNOWLEDGE (15 questions) ===
         (5, 1, "What type of knowledge does Hill say is important for success?", "Specialized knowledge", "Every possible fact", "General gossip", "Unused information", "a"),
         (5, 2, "What is the difference between general and specialized knowledge?", "Specialized knowledge is organised around a specific purpose or field", "General knowledge is always useless", "Specialized knowledge cannot be learned", "There is no difference", "a"),
@@ -574,7 +575,6 @@ def seed_questions(db = Depends(get_db)):
         (5, 13, "What should you do with knowledge once acquired?", "Organise it into practical plans", "Hide it", "Forget it", "Use it only for conversation", "a"),
         (5, 14, "Which person is better prepared to pursue a specialised goal?", "Someone who identifies and fills their knowledge gaps", "Someone who refuses to learn", "Someone who relies entirely on luck", "Someone who avoids experts", "a"),
         (5, 15, "What is the key lesson of the chapter?", "You need the right knowledge, whether acquired personally or through others, and must organise it for action", "You must know everything yourself", "General information guarantees wealth", "Learning should stop after school", "a"),
-
         # === CHAPTER 6 — IMAGINATION (15 questions) ===
         (6, 1, "What does Hill call imagination?", "The workshop of the mind", "A form of financial accounting", "A type of education", "A business licence", "a"),
         (6, 2, "What can imagination combine?", "Existing knowledge and ideas", "Only money", "Only emotions", "Only memories", "a"),
@@ -591,7 +591,6 @@ def seed_questions(db = Depends(get_db)):
         (6, 13, "What does imagination need to become useful?", "Direction and application", "No purpose", "No knowledge", "No action", "a"),
         (6, 14, "What should a person ask when facing a problem?", "What different solutions can I create?", "Who can I blame?", "Why should I quit?", "How can I avoid thinking?", "a"),
         (6, 15, "What is the central lesson of the chapter?", "Ideas can be developed through imagination and organised into useful plans", "Imagination is only entertainment", "Ideas have no economic value", "Imagination replaces persistence", "a"),
-
         # === CHAPTER 7 — ORGANIZED PLANNING (15 questions) ===
         (7, 1, "What does organized planning do to desire?", "Crystallizes desire into action", "Eliminates desire", "Delays action", "Replaces desire with fear", "a"),
         (7, 2, "What should a practical plan contain?", "Definite steps toward the objective", "Vague wishes", "Excuses", "Predictions only", "a"),
@@ -608,7 +607,6 @@ def seed_questions(db = Depends(get_db)):
         (7, 13, "What should compensation for cooperation be?", "It may take forms other than money", "It must always be cash", "It should never exist", "It is unnecessary", "a"),
         (7, 14, "What is the purpose of organised planning?", "To translate desire into practical action", "To create more wishes", "To postpone decisions", "To avoid people", "a"),
         (7, 15, "What is one of the chapter's most important lessons?", "Do not abandon the goal simply because the first plan fails", "Never change a plan", "Work alone", "Avoid criticism", "a"),
-
         # === CHAPTER 8 — DECISION (15 questions) ===
         (8, 1, "What does Hill identify as an important characteristic of successful people?", "Prompt decision-making", "Indecision", "Procrastination", "Avoidance", "a"),
         (8, 2, "What should decisions generally be made?", "Promptly", "After endless discussion", "Only when someone else decides", "Never", "a"),
@@ -625,7 +623,6 @@ def seed_questions(db = Depends(get_db)):
         (8, 13, "What does the chapter encourage?", "Independent thinking", "Blind conformity", "Endless waiting", "Avoidance", "a"),
         (8, 14, "Once a decision has been made, what should follow?", "Action", "Another year of hesitation", "Excuses", "Fear", "a"),
         (8, 15, "The title 'Mastery of Procrastination' suggests mastery over:", "Unnecessary delay", "Education", "Imagination", "Cooperation", "a"),
-
         # === CHAPTER 9 — PERSISTENCE (15 questions) ===
         (9, 1, "What does Hill say about persistence?", "It is a state of mind that can be cultivated", "It is impossible to develop", "It depends only on luck", "It is inherited", "a"),
         (9, 2, "Which factor is listed first among the eight causes of persistence?", "Definiteness of purpose", "Money", "Fame", "Age", "a"),
@@ -642,7 +639,6 @@ def seed_questions(db = Depends(get_db)):
         (9, 13, "What does Hill recommend when a plan fails?", "Continue by developing another plan", "Abandon the goal", "Blame circumstances", "Stop learning", "a"),
         (9, 14, "How can fear be weakened according to the chapter?", "Through repeated acts of courage", "Through avoidance", "Through procrastination", "Through indecision", "a"),
         (9, 15, "What is the central lesson of persistence?", "Continue sustained effort toward a definite purpose despite temporary setbacks", "Never change plans", "Never experience failure", "Depend on motivation alone", "a"),
-
         # === CHAPTER 10 — POWER OF THE MASTER MIND (15 questions) ===
         (10, 1, "What is the Master Mind based upon?", "Coordinated knowledge and effort of two or more people", "Working completely alone", "Competition", "Financial wealth only", "a"),
         (10, 2, "Why does Hill believe people need a Master Mind?", "No individual possesses all the experience and knowledge needed for every major undertaking", "People cannot think independently", "It eliminates responsibility", "It guarantees success", "a"),
@@ -659,7 +655,6 @@ def seed_questions(db = Depends(get_db)):
         (10, 13, "What should members bring to the relationship?", "Useful contribution", "Passive dependence", "Competition", "Secrecy", "a"),
         (10, 14, "What does the Master Mind strengthen?", "Collective problem-solving and organised effort", "Isolation", "Indecision", "Fear", "a"),
         (10, 15, "What is the central lesson?", "Combine capable people around a definite purpose and work in harmony", "Success must always be achieved alone", "Knowledge is unnecessary", "Teams eliminate responsibility", "a"),
-
         # === CHAPTER 11 — SEX TRANSMUTATION (15 questions) ===
         (11, 1, "What does Hill mean by 'transmutation' in this chapter?", "Changing or redirecting energy from one form into another", "Eliminating desire", "Avoiding creativity", "Removing emotion", "a"),
         (11, 2, "Which emotion does Hill describe as a powerful stimulus to the mind?", "Sex", "Indifference", "Boredom", "Laziness", "a"),
@@ -676,7 +671,6 @@ def seed_questions(db = Depends(get_db)):
         (11, 13, "Which of these is NOT one of Hill's listed mind stimuli?", "Love", "Music", "Friendship", "Procrastination", "d"),
         (11, 14, "What is the practical lesson that can be extracted from the chapter for this course?", "Channel strong motivation and energy into constructive goals", "Suppress all emotion", "Avoid ambition", "Stop creating", "a"),
         (11, 15, "Hill presents sex transmutation primarily as a method of:", "Redirecting powerful emotion toward constructive achievement", "Avoiding relationships", "Eliminating desire", "Replacing planning", "a"),
-
         # === CHAPTER 12 — THE SUBCONSCIOUS MIND (15 questions) ===
         (12, 1, "How does Hill describe the subconscious mind?", "A connecting link between the conscious mind and what he calls Infinite Intelligence", "A financial institution", "A physical muscle", "A form of formal education", "a"),
         (12, 2, "Does Hill say the subconscious mind remains idle?", "No", "Yes", "Only during sleep", "Only during work", "a"),
@@ -693,7 +687,6 @@ def seed_questions(db = Depends(get_db)):
         (12, 13, "What is one reason Hill repeatedly emphasises a written desire?", "To make the desire clear and repeatedly impress it upon the mind", "To replace action", "To avoid planning", "To impress other people", "a"),
         (12, 14, "What should the subconscious be 'fed' with?", "Desirable, constructive thoughts", "Fear", "Jealousy", "Hatred", "a"),
         (12, 15, "What is the practical lesson of the chapter?", "Deliberately cultivate the thoughts and emotions that support your definite purpose", "Stop thinking about your goal", "Depend entirely on the subconscious", "Avoid emotion", "a"),
-
         # === CHAPTER 13 — THE BRAIN (15 questions) ===
         (13, 1, "How does Hill describe the brain?", "A broadcasting and receiving station for thought", "A financial institution", "A computer in the modern technical sense", "A storage bank for money", "a"),
         (13, 2, "What does Hill believe the brain can receive?", "Thought impulses", "Money", "Physical products", "Qualifications", "a"),
@@ -710,7 +703,6 @@ def seed_questions(db = Depends(get_db)):
         (13, 13, "What can collective thinking help produce?", "New combinations of knowledge and ideas", "Less knowledge", "Automatic money", "Procrastination", "a"),
         (13, 14, "Hill's 'broadcasting and receiving' description should be understood in this course as:", "Part of Hill's philosophical framework", "An established modern scientific law", "A computer networking protocol", "A financial principle", "a"),
         (13, 15, "What is the practical lesson for participants?", "Feed your mind with quality knowledge and engage with capable thinkers", "Avoid learning from others", "Work entirely alone", "Stop developing imagination", "a"),
-
         # === CHAPTER 14 — THE SIXTH SENSE (15 questions) ===
         (14, 1, "What does Hill call the Sixth Sense?", "Creative imagination", "Physical strength", "Financial knowledge", "Memory", "a"),
         (14, 2, "When does Hill say the Sixth Sense becomes more accessible?", "After mastering the preceding principles", "Before learning anything", "Without any effort", "Only through money", "a"),
@@ -727,7 +719,6 @@ def seed_questions(db = Depends(get_db)):
         (14, 13, "What is the Sixth Sense connected to?", "Creative imagination and inspiration", "Physical strength", "Financial accounting", "Formal qualifications", "a"),
         (14, 14, "What is the purpose of mastering the earlier principles?", "To prepare the mind for the higher level of thinking Hill describes", "To eliminate planning", "To eliminate knowledge", "To avoid action", "a"),
         (14, 15, "What is the safest practical interpretation for the NYS course?", "Develop intuition and creativity, then test ideas before acting", "Treat every feeling as fact", "Stop gathering evidence", "Depend entirely on intuition", "a"),
-
         # === CHAPTER 15 — HOW TO OUTWIT THE SIX GHOSTS OF FEAR (15 questions) ===
         (15, 1, "What are the 'Six Ghosts of Fear'?", "Six major fears identified by Hill", "Six business competitors", "Six financial strategies", "Six types of imagination", "a"),
         (15, 2, "Which is the first fear listed by Hill?", "Fear of poverty", "Fear of education", "Fear of success", "Fear of travel", "a"),
@@ -754,4 +745,4 @@ def seed_questions(db = Depends(get_db)):
             correct_answer=corr, correct_answer_text=correct_text, marks=1
         ))
     db.commit()
-    return {"message": f"Successfully seeded {len(raw_questions)} questions!"}
+    return {"message": f"Successfully seeded all {len(raw_questions)} questions!"}
