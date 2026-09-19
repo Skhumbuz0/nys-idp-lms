@@ -16,22 +16,38 @@
 </div>
 
 <script>
-    const pid = localStorage.getItem('nys_participant_id');
-    const name = localStorage.getItem('nys_participant_name');
+    // Trim whitespace to prevent "undefined" or "NYS-2026-0001 " errors
+    const rawPid = localStorage.getItem('nys_participant_id');
+    const pid = rawPid ? rawPid.trim() : null;
+    const rawName = localStorage.getItem('nys_participant_name');
+    const name = rawName ? rawName.trim() : 'Learner';
     
-    if (!pid) {
+    if (!pid || pid === 'null' || pid === 'undefined') {
         window.location.href = '/login';
     } else {
-        document.getElementById('learner-name').textContent = name || 'Learner';
+        document.getElementById('learner-name').textContent = name;
         
         fetch(`/api/learner-dashboard/${pid}`)
-            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(async r => {
+                if (!r.ok) {
+                    const errorText = await r.text();
+                    throw new Error(`Server returned ${r.status}: ${errorText}`);
+                }
+                return r.json();
+            })
             .then(data => {
                 document.getElementById('loading').classList.add('hidden');
                 const grid = document.getElementById('courses-grid');
                 grid.classList.remove('hidden');
                 
-                data.courses.forEach(course => {
+                // Safely check if courses exist
+                const courses = data.courses || [];
+                if (courses.length === 0) {
+                    grid.innerHTML = '<p class="text-gray-600 col-span-2 text-center">No courses enrolled yet. Please contact your facilitator.</p>';
+                    return;
+                }
+
+                courses.forEach(course => {
                     let colorClass = course.code === 'NYS-IDP' ? 'border-purple-500' : 'border-green-500';
                     let btnColor = course.code === 'NYS-IDP' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700';
                     let route = course.code === 'NYS-IDP' ? '/my-progress' : '/nemisa';
@@ -59,9 +75,9 @@
                     grid.innerHTML += card;
                 });
             })
-            .catch(() => {
-                document.getElementById('loading').innerHTML = '<p class="text-red-600">Error loading courses. Please <a href="/login" class="underline">login again</a>.</p>';
+            .catch(err => {
+                console.error("Dashboard fetch error:", err);
+                document.getElementById('loading').innerHTML = `<p class="text-red-600">Error: ${err.message}. Please <a href="/login" class="underline font-bold">login again</a>.</p>`;
             });
     }
 </script>
-{% endblock %}
