@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-900">🖥️ NEMISA Command Centre</h2>
+        <p class="text-gray-600">Your 12-Course Digital Skills Journey</p>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="text-center py-20">
+        <p class="text-gray-600">Loading your NEMISA profile...</p>
+    </div>
+
+    <!-- Main Content -->
+    <div id="content" class="hidden space-y-6">
+        
+        <!-- Profile & Progress Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-600">
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800" id="p-name"></h3>
+                    <p class="text-sm text-gray-500 font-mono" id="p-id"></p>
+                    <p class="text-sm text-gray-500" id="p-email"></p>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div class="bg-blue-50 p-3 rounded">
+                        <p class="text-2xl font-bold text-blue-700" id="overall-pct">0%</p>
+                        <p class="text-xs text-gray-600">Overall Progress</p>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded">
+                        <p class="text-2xl font-bold text-green-700" id="completed-count">0/12</p>
+                        <p class="text-xs text-gray-600">Courses Done</p>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded">
+                        <p class="text-2xl font-bold text-purple-700" id="current-pct">0%</p>
+                        <p class="text-xs text-gray-600">Current Course</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Course Focus -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-md p-6 text-white">
+            <h3 class="text-lg font-bold mb-2">🎯 CURRENT FOCUS</h3>
+            <p class="text-2xl font-bold" id="current-course-name">Not Started</p>
+            <p class="text-sm opacity-90 mt-1">Target: Complete all modules and practical tasks</p>
+            <div class="mt-4 bg-white/20 rounded-full h-4">
+                <div id="current-progress-bar" class="bg-white h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 12-Course Journey -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">🗺️ 12-Course Journey</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-gray-700 uppercase">
+                        <tr>
+                            <th class="p-3">#</th>
+                            <th class="p-3">Code</th>
+                            <th class="p-3">Course Name</th>
+                            <th class="p-3">Progress</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Exam</th>
+                        </tr>
+                    </thead>
+                    <tbody id="journey-table">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid md:grid-cols-2 gap-4">
+            <a href="/nemisa/report" class="bg-green-600 text-white font-bold py-4 px-6 rounded-lg hover:bg-green-700 transition text-center shadow-lg">
+                📝 Submit Weekly NEMISA Report
+            </a>
+            <a href="/my-progress" class="bg-gray-600 text-white font-bold py-4 px-6 rounded-lg hover:bg-gray-700 transition text-center shadow-lg">
+                ← Back to IDP Progress
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const pid = localStorage.getItem('nys_participant_id');
+    
+    if (!pid) {
+        document.getElementById('loading').innerHTML = '<p class="text-red-600">Please <a href="/login" class="underline">login</a> to view your NEMISA Command Centre.</p>';
+    } else {
+        fetch(`/api/nemisa/${pid}`)
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(data => {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+                
+                document.getElementById('p-name').textContent = data.participant.name;
+                document.getElementById('p-id').textContent = data.participant.id;
+                document.getElementById('p-email').textContent = data.participant.email;
+                document.getElementById('overall-pct').textContent = data.progress.overall_pct + '%';
+                document.getElementById('completed-count').textContent = data.progress.completed + '/12';
+                document.getElementById('current-pct').textContent = data.progress.current_progress + '%';
+                document.getElementById('current-course-name').textContent = data.progress.current_course === 'None' ? 'Orientation / Not Started' : data.progress.current_course;
+                document.getElementById('current-progress-bar').style.width = data.progress.current_progress + '%';
+                
+                const tbody = document.getElementById('journey-table');
+                data.journey.forEach(course => {
+                    let statusColor = 'bg-gray-200 text-gray-700';
+                    let statusIcon = '○';
+                    if (course.status === 'COMPLETED') { statusColor = 'bg-green-100 text-green-800'; statusIcon = '✓'; }
+                    if (course.status === 'ACTIVE') { statusColor = 'bg-blue-100 text-blue-800'; statusIcon = '→'; }
+                    if (course.status === 'OVERDUE') { statusColor = 'bg-red-100 text-red-800'; statusIcon = '⚠️'; }
+                    
+                    const examBadge = course.exam_passed ? '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Passed</span>' : '<span class="text-xs text-gray-400">Pending</span>';
+                    
+                    const row = `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-3">${course.sequence}</td>
+                            <td class="p-3 font-mono font-bold">${course.code}</td>
+                            <td class="p-3">${course.name}</td>
+                            <td class="p-3">
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${course.progress}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-500">${course.progress}%</span>
+                            </td>
+                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${statusColor}">${statusIcon} ${course.status}</span></td>
+                            <td class="p-3">${examBadge}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            })
+            .catch(() => {
+                document.getElementById('loading').innerHTML = '<p class="text-red-600">Error loading data. Please try again.</p>';
+            });
+    }
+</script>
+{% endblock %}

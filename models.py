@@ -1,4 +1,5 @@
-﻿from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+﻿# models.py
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -38,6 +39,7 @@ class Participant(Base):
     day30_current_streak = Column(Integer, default=0)
     
     daily_responses = relationship("DailyResponse", back_populates="participant")
+    nemisa_assignments = relationship("NemisaAssignment", back_populates="participant")
 
 class Question(Base):
     __tablename__ = "questions"
@@ -74,3 +76,42 @@ class DailyResponse(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     
     participant = relationship("Participant", back_populates="daily_responses")
+
+class NemisaCourse(Base):
+    __tablename__ = "nemisa_courses"
+    id = Column(Integer, primary_key=True, index=True)
+    sequence = Column(Integer, unique=True)
+    code = Column(String, unique=True, index=True)
+    name = Column(String)
+    track = Column(String)
+    target_weeks = Column(Integer)
+
+class NemisaAssignment(Base):
+    __tablename__ = "nemisa_assignments"
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(String, ForeignKey("participants.participant_id"))
+    course_code = Column(String, ForeignKey("nemisa_courses.code"))
+    status = Column(String, default="NOT STARTED")
+    progress_pct = Column(Integer, default=0)
+    start_date = Column(DateTime, nullable=True)
+    target_date = Column(DateTime, nullable=True)
+    completion_date = Column(DateTime, nullable=True)
+    exam_booked = Column(Boolean, default=False)
+    exam_passed = Column(Boolean, default=False)
+    
+    participant = relationship("Participant", back_populates="nemisa_assignments")
+
+class NemisaWeeklyReport(Base):
+    __tablename__ = "nemisa_weekly_reports"
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(String, ForeignKey("participants.participant_id"))
+    week_number = Column(Integer)
+    course_code = Column(String)
+    accessed_nemisa = Column(Boolean, default=False)
+    target_met = Column(String)
+    progress_pct = Column(Integer, default=0)
+    learnings = Column(String)
+    practical_activity = Column(String)
+    blockers = Column(String)
+    support_needed = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)

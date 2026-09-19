@@ -3,24 +3,21 @@ import re
 import json
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from database import Base, engine, get_db
-from models import Participant, Question, QuizResponse, DailyResponse
+from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport
 import resend
 
-aapp = FastAPI(title="NYS IDP LMS")
+app = FastAPI(title="NYS IDP LMS")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory=Path("templates"))
 
-# Admin password
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "MAYO2026!")
-
-# Email configuration
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "MAYO NYS IDP <onboarding@resend.dev>")
 
@@ -28,19 +25,12 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", "MAYO NYS IDP <onboarding@resend.dev>")
 # EMAIL UTILITIES
 # ==========================================
 def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an email using Resend. Returns True on success, False on failure."""
     if not RESEND_API_KEY:
         print(f"⚠️ WARNING: RESEND_API_KEY not set. Email to {to_email} not sent.")
         return False
-    
     try:
         resend.api_key = RESEND_API_KEY
-        resend.Emails.send({
-            "from": FROM_EMAIL,
-            "to": to_email,
-            "subject": subject,
-            "html": html_content
-        })
+        resend.Emails.send({"from": FROM_EMAIL, "to": to_email, "subject": subject, "html": html_content})
         print(f"✅ Email sent to {to_email}: {subject}")
         return True
     except Exception as e:
@@ -48,103 +38,57 @@ def send_email(to_email: str, subject: str, html_content: str) -> bool:
         return False
 
 def build_daily_action_email(participant: Participant, day: int, day_data: dict, form_data: dict) -> tuple:
-    """Build the email content for a daily action submission."""
-    
-    # Extract questions and answers
-    qa_pairs = []
-    for q in day_data["questions"]:
-        q_id = q["id"]
-        answer = form_data.get(f"q_{q_id}", "No answer provided")
-        qa_pairs.append({"question": q["label"], "answer": answer})
-    
+    qa_pairs = [{"question": q["label"], "answer": form_data.get(f"q_{q['id']}", "No answer provided")} for q in day_data["questions"]]
     action_status = form_data.get("action_status", "No")
     reflection = form_data.get("reflection", "No reflection provided")
     
-    # Build HTML email
-    html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb;">
+    html = f"""<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb;">
         <div style="background: #1f2937; color: white; padding: 20px; text-align: center;">
             <h1 style="margin: 0; font-size: 24px;">MAYO — NYS IDP</h1>
             <p style="margin: 5px 0 0 0; color: #9ca3af;">Think & Grow Rich 30-Day Challenge</p>
         </div>
-        
         <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
             <h2 style="color: #1f2937; margin-top: 0;">🎯 Day {day} Complete: {day_data['title']}</h2>
             <p style="color: #6b7280;">Hi {participant.full_name},</p>
             <p style="color: #374151;">Great work completing Day {day}! Here's a summary of your responses:</p>
-            
             <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
-                <h3 style="color: #1e40af; margin-top: 0;">📝 Your Responses</h3>
-    """
-    
+                <h3 style="color: #1e40af; margin-top: 0;">📝 Your Responses</h3>"""
     for qa in qa_pairs:
-        html += f"""
-                <div style="margin-bottom: 15px;">
-                    <p style="color: #374151; font-weight: bold; margin-bottom: 5px;">{qa['question']}</p>
-                    <p style="color: #6b7280; margin: 0; padding-left: 15px; border-left: 2px solid #d1d5db;">{qa['answer']}</p>
-                </div>
-        """
-    
-    html += f"""
-            </div>
-            
+        html += f"""<div style="margin-bottom: 15px;">
+            <p style="color: #374151; font-weight: bold; margin-bottom: 5px;">{qa['question']}</p>
+            <p style="color: #6b7280; margin: 0; padding-left: 15px; border-left: 2px solid #d1d5db;">{qa['answer']}</p></div>"""
+    html += f"""</div>
             <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0;">
                 <h3 style="color: #166534; margin-top: 0;">🚀 Today's Action</h3>
                 <p style="color: #374151; margin: 5px 0;"><strong>Task:</strong> {day_data['action']}</p>
                 <p style="color: #374151; margin: 5px 0;"><strong>Status:</strong> {action_status}</p>
             </div>
-            
             <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
                 <h3 style="color: #92400e; margin-top: 0;">🔄 Your Reflection</h3>
                 <p style="color: #374151; margin: 0; font-style: italic;">"{reflection}"</p>
             </div>
-            
             <div style="text-align: center; margin: 30px 0;">
-                <p style="color: #6b7280; font-size: 14px;">
-                    You've completed <strong>{participant.day30_completed_days}</strong> out of 30 days.<br>
-                    Keep going — consistency is the key to transformation!
-                </p>
+                <p style="color: #6b7280; font-size: 14px;">You've completed <strong>{participant.day30_completed_days}</strong> out of 30 days.<br>Keep going!</p>
             </div>
         </div>
-        
         <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-            <p>MAYO — NYS IDP Learning Management System</p>
-            <p>Participant ID: {participant.participant_id}</p>
-        </div>
-    </div>
-    """
-    
-    subject = f"Day {day} Complete: {day_data['title']} — MAYO NYS IDP"
-    return subject, html
+            <p>MAYO — NYS IDP Learning Management System</p><p>Participant ID: {participant.participant_id}</p>
+        </div></div>"""
+    return f"Day {day} Complete: {day_data['title']} — MAYO NYS IDP", html
 
 def build_final_report_email(participant: Participant, db) -> tuple:
-    """Build the comprehensive final report email after Day 30."""
+    daily_responses = db.query(DailyResponse).filter(DailyResponse.participant_id == participant.participant_id).order_by(DailyResponse.day).all()
+    quizzes = db.query(QuizResponse).filter(QuizResponse.participant_id == participant.participant_id).order_by(QuizResponse.week).all()
+    day_29 = next((r for r in daily_responses if r.day == 29), None)
+    day_30 = next((r for r in daily_responses if r.day == 30), None)
     
-    # Get all daily responses
-    daily_responses = db.query(DailyResponse).filter(
-        DailyResponse.participant_id == participant.participant_id
-    ).order_by(DailyResponse.day).all()
-    
-    # Get quiz results
-    quizzes = db.query(QuizResponse).filter(
-        QuizResponse.participant_id == participant.participant_id
-    ).order_by(QuizResponse.week).all()
-    
-    # Extract 90-day plan from Day 29
-    day_29_response = next((r for r in daily_responses if r.day == 29), None)
-    day_30_response = next((r for r in daily_responses if r.day == 30), None)
-    
-    # Build HTML email
-    html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #f9fafb;">
+    html = f"""<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #f9fafb;">
         <div style="background: linear-gradient(135deg, #1f2937 0%, #3b82f6 100%); color: white; padding: 30px; text-align: center;">
             <h1 style="margin: 0; font-size: 28px;">🎉 Congratulations, {participant.full_name}!</h1>
             <p style="margin: 10px 0 0 0; font-size: 18px;">You've completed the 30-Day Challenge</p>
         </div>
-        
         <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
             <h2 style="color: #1f2937;">📊 Your Final Progress Report</h2>
-            
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
                 <div style="background: #eff6ff; padding: 15px; border-radius: 8px; text-align: center;">
                     <p style="color: #6b7280; margin: 0; font-size: 12px;">Overall Progress</p>
@@ -159,112 +103,58 @@ def build_final_report_email(participant: Participant, db) -> tuple:
                     <p style="color: #6b21a8; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.overall_quiz_pct:.1f}%</p>
                 </div>
             </div>
-            
             <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
                 <p style="color: #92400e; margin: 0;"><strong>Status:</strong> {participant.risk_status}</p>
             </div>
-            
             <h3 style="color: #1f2937; margin-top: 30px;">📘 Weekly Quiz Results</h3>
             <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-                <tr style="background: #f3f4f6;">
-                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Week</th>
-                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Score</th>
-                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Percentage</th>
-                </tr>
-    """
+                <tr style="background: #f3f4f6;"><th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Week</th>
+                <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Score</th>
+                <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Percentage</th></tr>"""
     
     week_names = {1: "Discover", 2: "Build Mindset", 3: "Turn Ideas Into Plans", 4: "Execute & Persist"}
     for week_num in range(1, 5):
         quiz = next((q for q in quizzes if q.week == week_num), None)
         if quiz:
-            html += f"""
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
-                    <td style="padding: 10px; border: 1px solid #d1d5db;">{quiz.score}/{quiz.max_score}</td>
-                    <td style="padding: 10px; border: 1px solid #d1d5db; font-weight: bold;">{quiz.percentage:.1f}%</td>
-                </tr>
-            """
+            html += f"""<tr><td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
+                <td style="padding: 10px; border: 1px solid #d1d5db;">{quiz.score}/{quiz.max_score}</td>
+                <td style="padding: 10px; border: 1px solid #d1d5db; font-weight: bold;">{quiz.percentage:.1f}%</td></tr>"""
         else:
-            html += f"""
-                <tr style="background: #fef2f2;">
-                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
-                    <td style="padding: 10px; border: 1px solid #d1d5db;" colspan="2">Not completed</td>
-                </tr>
-            """
+            html += f"""<tr style="background: #fef2f2;"><td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
+                <td style="padding: 10px; border: 1px solid #d1d5db;" colspan="2">Not completed</td></tr>"""
     
-    html += """
-            </table>
-            
-            <h3 style="color: #1f2937; margin-top: 30px;">📅 Your 30-Day Journey</h3>
-            <p style="color: #6b7280;">Here's a summary of each day you completed:</p>
-    """
-    
+    html += "</table><h3 style='color: #1f2937; margin-top: 30px;'>📅 Your 30-Day Journey</h3><p style='color: #6b7280;'>Here's a summary of each day you completed:</p>"
     for response in daily_responses:
-        day_num = response.day
-        if day_num <= 30:
-            day_title = CURRICULUM[day_num]["title"]
-            html += f"""
-                <div style="background: #f9fafb; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3b82f6;">
-                    <p style="color: #1f2937; font-weight: bold; margin: 0 0 10px 0;">Day {day_num}: {day_title}</p>
-                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px;"><strong>Action Status:</strong> {response.action_status}</p>
-                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px; font-style: italic;"><strong>Reflection:</strong> {response.reflection}</p>
-                </div>
-            """
+        if response.day <= 30:
+            html += f"""<div style="background: #f9fafb; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                <p style="color: #1f2937; font-weight: bold; margin: 0 0 10px 0;">Day {response.day}: {CURRICULUM[response.day]['title']}</p>
+                <p style="color: #6b7280; margin: 5px 0; font-size: 14px;"><strong>Action Status:</strong> {response.action_status}</p>
+                <p style="color: #6b7280; margin: 5px 0; font-size: 14px; font-style: italic;"><strong>Reflection:</strong> {response.reflection}</p></div>"""
     
-    # Add 90-day plan if Day 29 was completed
-    if day_29_response:
-        responses_json = json.loads(day_29_response.responses_json)
-        html += f"""
-            <h3 style="color: #1f2937; margin-top: 30px;">🎯 Your 90-Day Action Plan</h3>
-            <p style="color: #6b7280;">Based on your Day 29 responses, here's your personalized 90-day plan:</p>
-            
-            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-                <h4 style="color: #065f46; margin-top: 0;">Goal 1</h4>
-                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g1', 'Not specified')}</p>
-            </div>
-            
-            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-                <h4 style="color: #065f46; margin-top: 0;">Goal 2</h4>
-                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g2', 'Not specified')}</p>
-            </div>
-            
-            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-                <h4 style="color: #065f46; margin-top: 0;">Goal 3</h4>
-                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g3', 'Not specified')}</p>
-            </div>
-        """
+    if day_29:
+        r29 = json.loads(day_29.responses_json)
+        html += f"""<h3 style="color: #1f2937; margin-top: 30px;">🎯 Your 90-Day Action Plan</h3>
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;"><h4 style="color: #065f46; margin-top: 0;">Goal 1</h4><p style="color: #374151; white-space: pre-wrap;">{r29.get('q_90_g1', 'Not specified')}</p></div>
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;"><h4 style="color: #065f46; margin-top: 0;">Goal 2</h4><p style="color: #374151; white-space: pre-wrap;">{r29.get('q_90_g2', 'Not specified')}</p></div>
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;"><h4 style="color: #065f46; margin-top: 0;">Goal 3</h4><p style="color: #374151; white-space: pre-wrap;">{r29.get('q_90_g3', 'Not specified')}</p></div>"""
     
-    # Add final commitment if Day 30 was completed
-    if day_30_response:
-        responses_json = json.loads(day_30_response.responses_json)
-        html += f"""
-            <h3 style="color: #1f2937; margin-top: 30px;">💎 Your Final Commitment</h3>
+    if day_30:
+        r30 = json.loads(day_30.responses_json)
+        html += f"""<h3 style="color: #1f2937; margin-top: 30px;">💎 Your Final Commitment</h3>
             <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                <p style="color: #374151; font-style: italic; white-space: pre-wrap; margin: 0;">"{responses_json.get('q_final_commit', 'Not specified')}"</p>
-            </div>
-        """
+                <p style="color: #374151; font-style: italic; white-space: pre-wrap;">"{r30.get('q_final_commit', 'Not specified')}"</p></div>"""
     
-    html += f"""
-            <div style="text-align: center; margin: 40px 0; padding: 30px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 8px; color: white;">
+    html += f"""<div style="text-align: center; margin: 40px 0; padding: 30px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 8px; color: white;">
                 <h3 style="margin-top: 0;">🚀 Your Journey Continues</h3>
-                <p style="margin: 10px 0;">You've built the foundation. Now it's time to execute your 90-day plan with the same discipline and commitment.</p>
-                <p style="margin: 10px 0; font-weight: bold;">Remember: Success is not a destination, it's a journey.</p>
-            </div>
-        </div>
-        
+                <p style="margin: 10px 0;">You've built the foundation. Now it's time to execute your 90-day plan.</p>
+            </div></div>
         <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-            <p>MAYO — NYS IDP Learning Management System</p>
-            <p>Participant ID: {participant.participant_id}</p>
-            <p>This report was generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
-        </div>
-    </div>
-    """
-    
-    subject = f"🎉 Your 30-Day Challenge Final Report — MAYO NYS IDP"
-    return subject, html
+            <p>MAYO — NYS IDP Learning Management System</p><p>Participant ID: {participant.participant_id}</p>
+        </div></div>"""
+    return "🎉 Your 30-Day Challenge Final Report — MAYO NYS IDP", html
 
 # ==========================================
-# THE 30-DAY CURRICULUM ENGINE
+# CURRICULUM & UTILITIES
 # ==========================================
 CURRICULUM = {
     1: {"week": 1, "title": "Start With Yourself", "questions": [
@@ -432,538 +322,192 @@ CURRICULUM = {
 }
 
 WEEK_INFO = {
-    1: {"title": "Discover", "chapters": [1,2,3,4], "max_score": 60, "description": "Chapters 1-4: Introduction, Desire, Faith, Auto-Suggestion"},
-    2: {"title": "Build Mindset", "chapters": [5,6,7,8], "max_score": 60, "description": "Chapters 5-8: Specialized Knowledge, Imagination, Organized Planning, Decision"},
-    3: {"title": "Turn Ideas Into Plans", "chapters": [9,10,11,12], "max_score": 60, "description": "Chapters 9-12: Persistence, Master Mind, Sex Transmutation, Subconscious Mind"},
-    4: {"title": "Execute & Persist", "chapters": [13,14,15], "max_score": 45, "description": "Chapters 13-15: The Brain, The Sixth Sense, Six Ghosts of Fear"}
+    1: {"title": "Discover", "chapters": [1,2,3,4], "max_score": 60, "description": "Chapters 1-4"},
+    2: {"title": "Build Mindset", "chapters": [5,6,7,8], "max_score": 60, "description": "Chapters 5-8"},
+    3: {"title": "Turn Ideas Into Plans", "chapters": [9,10,11,12], "max_score": 60, "description": "Chapters 9-12"},
+    4: {"title": "Execute & Persist", "chapters": [13,14,15], "max_score": 45, "description": "Chapters 13-15"}
 }
 
-# ==========================================
-# UTILITIES
-# ==========================================
 def generate_participant_id(db) -> str:
     highest = 0
     for (pid,) in db.query(Participant.participant_id).all():
         if pid:
             match = re.search(r'(\d+)$', pid)
-            if match and int(match.group(1)) > highest:
-                highest = int(match.group(1))
+            if match and int(match.group(1)) > highest: highest = int(match.group(1))
     return f"NYS-2026-{str(highest + 1).zfill(4)}"
 
 def update_participant_progress(db, participant_id: str):
     p = db.query(Participant).filter(Participant.participant_id == participant_id).first()
     if not p: return
-    
     progress = 5.0 if p.registration_complete else 0.0
     quizzes = db.query(QuizResponse).filter(QuizResponse.participant_id == participant_id).all()
     progress += len({q.week for q in quizzes}) * 11.25
-    
     actions = db.query(DailyResponse).filter(DailyResponse.participant_id == participant_id).all()
     unique_days = len({a.day for a in actions})
     action_pct = min(100.0, (unique_days / 30.0) * 100)
     progress += (action_pct / 100.0) * 40.0
-    
     if p.final_idp_complete: progress += 10.0
     progress = min(100.0, progress)
-    
     p.overall_progress_pct = progress
     p.day30_action_progress_pct = action_pct
     p.day30_completed_days = unique_days
-    
     if unique_days >= 7: p.week1_actions_complete = True
     if unique_days >= 14: p.week2_actions_complete = True
     if unique_days >= 21: p.week3_actions_complete = True
     if unique_days >= 30: p.week4_actions_complete = True
-    
-    if quizzes:
-        p.overall_quiz_pct = (sum(q.score for q in quizzes) / sum(q.max_score for q in quizzes)) * 100
-    
-    if unique_days == 0 and not quizzes:
-        p.risk_status, p.risk_reason = "Not Started", ""
-    elif action_pct < 30 or (p.overall_quiz_pct or 0) < 40:
-        p.risk_status, p.risk_reason = "At Risk", "Low engagement in actions or quizzes"
-    elif action_pct < 60 or (p.overall_quiz_pct or 0) < 60:
-        p.risk_status, p.risk_reason = "Needs Attention", "Below expected weekly threshold"
-    else:
-        p.risk_status, p.risk_reason = "On Track", ""
-        
+    if quizzes: p.overall_quiz_pct = (sum(q.score for q in quizzes) / sum(q.max_score for q in quizzes)) * 100
+    if unique_days == 0 and not quizzes: p.risk_status, p.risk_reason = "Not Started", ""
+    elif action_pct < 30 or (p.overall_quiz_pct or 0) < 40: p.risk_status, p.risk_reason = "At Risk", "Low engagement"
+    elif action_pct < 60 or (p.overall_quiz_pct or 0) < 60: p.risk_status, p.risk_reason = "Needs Attention", "Below threshold"
+    else: p.risk_status, p.risk_reason = "On Track", ""
     p.last_activity = datetime.utcnow()
     db.commit()
 
 # ==========================================
-# PUBLIC ROUTES
+# PUBLIC & LOGIN ROUTES
 # ==========================================
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    return templates.TemplateResponse(request=request, name="home.html", context={})
+def home(request: Request): return templates.TemplateResponse(request=request, name="home.html", context={})
 
 @app.get("/register", response_class=HTMLResponse)
-def register_form(request: Request):
-    return templates.TemplateResponse(request=request, name="register.html", context={})
+def register_form(request: Request): return templates.TemplateResponse(request=request, name="register.html", context={})
 
 @app.post("/register")
 def process_register(request: Request, db = Depends(get_db), full_name: str = Form(...), email: str = Form(...), phone: str = Form(""), age_range: str = Form(...), main_goal: str = Form(...)):
     pid = generate_participant_id(db)
-    new_p = Participant(
-        participant_id=pid, full_name=full_name, email=email.lower(), phone=phone, 
-        age_range=age_range, main_goal=main_goal, registration_complete=True, last_activity=datetime.utcnow()
-    )
-    db.add(new_p)
-    db.commit()
-    update_participant_progress(db, pid)
+    new_p = Participant(participant_id=pid, full_name=full_name, email=email.lower(), phone=phone, age_range=age_range, main_goal=main_goal, registration_complete=True, last_activity=datetime.utcnow())
+    db.add(new_p); db.commit(); update_participant_progress(db, pid)
     return templates.TemplateResponse(request=request, name="register_success.html", context={"pid": pid, "name": full_name})
 
-# ==========================================
-# LEARNER LOGIN SYSTEM
-# ==========================================
 @app.get("/login", response_class=HTMLResponse)
-def login_choice(request: Request):
-    return templates.TemplateResponse(request=request, name="login_choice.html", context={})
+def login_choice(request: Request): return templates.TemplateResponse(request=request, name="login_choice.html", context={})
 
 @app.get("/login/learner", response_class=HTMLResponse)
-def learner_login_form(request: Request):
-    return templates.TemplateResponse(request=request, name="login.html", context={})
+def learner_login_form(request: Request): return templates.TemplateResponse(request=request, name="login.html", context={})
 
 @app.post("/login/learner")
 def process_learner_login(request: Request, db = Depends(get_db), participant_id: str = Form(...)):
     pid = participant_id.strip().upper()
     p = db.query(Participant).filter(Participant.participant_id == pid).first()
-    if not p:
-        return templates.TemplateResponse(request=request, name="login.html", context={"error": "Participant ID not found. Please check and try again."})
+    if not p: return templates.TemplateResponse(request=request, name="login.html", context={"error": "Participant ID not found."})
     return templates.TemplateResponse(request=request, name="login_success.html", context={"pid": pid, "name": p.full_name})
 
-# ==========================================
-# FACILITATOR/ADMIN LOGIN SYSTEM
-# ==========================================
 @app.get("/login/facilitator", response_class=HTMLResponse)
-def facilitator_login_form(request: Request):
-    return templates.TemplateResponse(request=request, name="facilitator_login.html", context={})
+def facilitator_login_form(request: Request): return templates.TemplateResponse(request=request, name="facilitator_login.html", context={})
 
 @app.post("/login/facilitator")
 def process_facilitator_login(request: Request, password: str = Form(...)):
-    if password.strip() == ADMIN_PASSWORD:
-        return templates.TemplateResponse(request=request, name="facilitator_login_success.html", context={})
-    return templates.TemplateResponse(request=request, name="facilitator_login.html", context={"error": "Incorrect password. Please try again."})
+    if password.strip() == ADMIN_PASSWORD: return templates.TemplateResponse(request=request, name="facilitator_login_success.html", context={})
+    return templates.TemplateResponse(request=request, name="facilitator_login.html", context={"error": "Incorrect password."})
 
 @app.get("/logout", response_class=HTMLResponse)
-def logout(request: Request):
-    return templates.TemplateResponse(request=request, name="logout.html", context={})
+def logout(request: Request): return templates.TemplateResponse(request=request, name="logout.html", context={})
 
 # ==========================================
-# LEARNER DASHBOARD
+# LEARNER DASHBOARD & QUIZ ROUTES
 # ==========================================
 @app.get("/my-progress", response_class=HTMLResponse)
-def my_progress(request: Request):
-    return templates.TemplateResponse(request=request, name="my_progress.html", context={})
+def my_progress(request: Request): return templates.TemplateResponse(request=request, name="my_progress.html", context={})
 
 @app.get("/api/participant/{pid}")
 def get_participant_api(pid: str, db = Depends(get_db)):
     p = db.query(Participant).filter(Participant.participant_id == pid.upper()).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Participant not found")
-    
+    if not p: raise HTTPException(status_code=404, detail="Participant not found")
     quizzes = db.query(QuizResponse).filter(QuizResponse.participant_id == pid.upper()).all()
     actions = db.query(DailyResponse).filter(DailyResponse.participant_id == pid.upper()).all()
-    
-    return {
-        "participant_id": p.participant_id,
-        "full_name": p.full_name,
-        "email": p.email,
-        "overall_progress_pct": p.overall_progress_pct or 0,
-        "overall_quiz_pct": p.overall_quiz_pct or 0,
-        "day30_action_progress_pct": p.day30_action_progress_pct or 0,
-        "day30_completed_days": p.day30_completed_days or 0,
-        "day30_current_streak": p.day30_current_streak or 0,
-        "risk_status": p.risk_status or "Not Started",
-        "week1_complete": p.week1_complete,
-        "week2_complete": p.week2_complete,
-        "week3_complete": p.week3_complete,
-        "week4_complete": p.week4_complete,
-        "quizzes": [{"week": q.week, "score": q.score, "max_score": q.max_score, "percentage": q.percentage} for q in quizzes],
-        "completed_days": sorted(list(set(a.day for a in actions)))
-    }
+    return {"participant_id": p.participant_id, "full_name": p.full_name, "email": p.email, "overall_progress_pct": p.overall_progress_pct or 0, "overall_quiz_pct": p.overall_quiz_pct or 0, "day30_action_progress_pct": p.day30_action_progress_pct or 0, "day30_completed_days": p.day30_completed_days or 0, "day30_current_streak": p.day30_current_streak or 0, "risk_status": p.risk_status or "Not Started", "week1_complete": p.week1_complete, "week2_complete": p.week2_complete, "week3_complete": p.week3_complete, "week4_complete": p.week4_complete, "quizzes": [{"week": q.week, "score": q.score, "max_score": q.max_score, "percentage": q.percentage} for q in quizzes], "completed_days": sorted(list(set(a.day for a in actions)))}
 
-# ==========================================
-# WEEKLY QUIZ HUB & ROUTES
-# ==========================================
 @app.get("/quizzes", response_class=HTMLResponse)
-def quiz_hub(request: Request, db = Depends(get_db)):
-    return templates.TemplateResponse(request=request, name="quiz_hub.html", context={"week_info": WEEK_INFO})
+def quiz_hub(request: Request, db = Depends(get_db)): return templates.TemplateResponse(request=request, name="quiz_hub.html", context={"week_info": WEEK_INFO})
 
 @app.get("/quiz/{week}", response_class=HTMLResponse)
 def quiz_form(request: Request, week: int, db = Depends(get_db)):
-    if week < 1 or week > 4:
-        raise HTTPException(status_code=404, detail="Week out of range")
-    
+    if week < 1 or week > 4: raise HTTPException(status_code=404, detail="Week out of range")
     chapters = WEEK_INFO[week]["chapters"]
     questions = db.query(Question).filter(Question.chapter.in_(chapters)).order_by(Question.chapter, Question.id).all()
-    
-    return templates.TemplateResponse(request=request, name="quiz.html", context={
-        "week": week, 
-        "week_title": WEEK_INFO[week]["title"],
-        "week_description": WEEK_INFO[week]["description"],
-        "questions": questions
-    })
+    return templates.TemplateResponse(request=request, name="quiz.html", context={"week": week, "week_title": WEEK_INFO[week]["title"], "week_description": WEEK_INFO[week]["description"], "questions": questions})
 
 @app.post("/quiz/{week}")
 async def process_quiz(week: int, request: Request, db = Depends(get_db)):
     form_data = await request.form()
     pid = str(form_data.get("participant_id", "")).strip().upper()
-    
     p = db.query(Participant).filter(Participant.participant_id == pid).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Participant not found. Please register first.")
-        
+    if not p: raise HTTPException(status_code=404, detail="Participant not found.")
     chapters = WEEK_INFO[week]["chapters"]
     max_score = WEEK_INFO[week]["max_score"]
-    
     questions = db.query(Question).filter(Question.chapter.in_(chapters)).all()
-    
-    score = 0
-    for q in questions:
-        user_ans = str(form_data.get(f"q_{q.question_id}", "")).strip().lower()
-        if user_ans == str(q.correct_answer).strip().lower():
-            score += q.marks
-            
+    score = sum(q.marks for q in questions if str(form_data.get(f"q_{q.question_id}", "")).strip().lower() == str(q.correct_answer).strip().lower())
     pct = (score / max_score * 100) if max_score > 0 else 0
-    
     existing_quiz = db.query(QuizResponse).filter(QuizResponse.participant_id == pid, QuizResponse.week == week).first()
-    if existing_quiz:
-        existing_quiz.score = score
-        existing_quiz.max_score = max_score
-        existing_quiz.percentage = pct
-    else:
-        db.add(QuizResponse(participant_id=pid, week=week, score=score, max_score=max_score, percentage=pct))
-        
+    if existing_quiz: existing_quiz.score, existing_quiz.max_score, existing_quiz.percentage = score, max_score, pct
+    else: db.add(QuizResponse(participant_id=pid, week=week, score=score, max_score=max_score, percentage=pct))
     setattr(p, f"week{week}_complete", True)
-    db.commit()
-    
-    update_participant_progress(db, pid)
+    db.commit(); update_participant_progress(db, pid)
     return RedirectResponse(url="/my-progress", status_code=303)
 
 # ==========================================
 # DAILY ACTION ROUTES
 # ==========================================
-app = FastAPI(title="NYS IDP LMS")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory=Path("templates"))
+@app.get("/daily-action", response_class=HTMLResponse)
+def daily_action_hub(request: Request, db = Depends(get_db)): return templates.TemplateResponse(request=request, name="daily_action_hub.html", context={"curriculum": CURRICULUM})
 
-# Admin password
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "MAYO2026!")
+@app.get("/daily-action/{day}", response_class=HTMLResponse)
+def daily_action_form(request: Request, day: int):
+    if day < 1 or day > 30: raise HTTPException(status_code=404, detail="Day out of range")
+    return templates.TemplateResponse(request=request, name="daily_action.html", context={"day": day, "day_data": CURRICULUM[day]})
 
-# Email configuration
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-FROM_EMAIL = os.getenv("FROM_EMAIL", "MAYO NYS IDP <onboarding@resend.dev>")
-
-# ==========================================
-# EMAIL UTILITIES
-# ==========================================
-def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an email using Resend. Returns True on success, False on failure."""
-    if not RESEND_API_KEY:
-        print(f"⚠️ WARNING: RESEND_API_KEY not set. Email to {to_email} not sent.")
-        return False
-    
-    try:
-        resend.api_key = RESEND_API_KEY
-        resend.Emails.send({
-            "from": FROM_EMAIL,
-            "to": to_email,
-            "subject": subject,
-            "html": html_content
-        })
-        print(f"✅ Email sent to {to_email}: {subject}")
-        return True
-    except Exception as e:
-        print(f"❌ Email error for {to_email}: {e}")
-        return False
-
-def build_daily_action_email(participant: Participant, day: int, day_data: dict, form_data: dict) -> tuple:
-    """Build the email content for a daily action submission."""
-    
-    # Extract questions and answers
-    qa_pairs = []
-    for q in day_data["questions"]:
-        q_id = q["id"]
-        answer = form_data.get(f"q_{q_id}", "No answer provided")
-        qa_pairs.append({"question": q["label"], "answer": answer})
-    
+@app.post("/daily-action/{day}")
+async def process_daily_action(day: int, request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    p = db.query(Participant).filter(Participant.participant_id == pid).first()
+    if not p: raise HTTPException(status_code=404, detail="Participant not found")
+    responses = {key: value for key, value in form_data.items() if key.startswith("q_")}
     action_status = form_data.get("action_status", "No")
-    reflection = form_data.get("reflection", "No reflection provided")
-    
-    # Build HTML email
-    html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb;">
-        <div style="background: #1f2937; color: white; padding: 20px; text-align: center;">
-            <h1 style="margin: 0; font-size: 24px;">MAYO — NYS IDP</h1>
-            <p style="margin: 5px 0 0 0; color: #9ca3af;">Think & Grow Rich 30-Day Challenge</p>
-        </div>
-        
-        <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
-            <h2 style="color: #1f2937; margin-top: 0;">🎯 Day {day} Complete: {day_data['title']}</h2>
-            <p style="color: #6b7280;">Hi {participant.full_name},</p>
-            <p style="color: #374151;">Great work completing Day {day}! Here's a summary of your responses:</p>
-            
-            <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
-                <h3 style="color: #1e40af; margin-top: 0;">📝 Your Responses</h3>
-    """
-    
-    for qa in qa_pairs:
-        html += f"""
-                <div style="margin-bottom: 15px;">
-                    <p style="color: #374151; font-weight: bold; margin-bottom: 5px;">{qa['question']}</p>
-                    <p style="color: #6b7280; margin: 0; padding-left: 15px; border-left: 2px solid #d1d5db;">{qa['answer']}</p>
-                </div>
-        """
-    
-    html += f"""
-            </div>
-            
-            <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0;">
-                <h3 style="color: #166534; margin-top: 0;">🚀 Today's Action</h3>
-                <p style="color: #374151; margin: 5px 0;"><strong>Task:</strong> {day_data['action']}</p>
-                <p style="color: #374151; margin: 5px 0;"><strong>Status:</strong> {action_status}</p>
-            </div>
-            
-            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-                <h3 style="color: #92400e; margin-top: 0;">🔄 Your Reflection</h3>
-                <p style="color: #374151; margin: 0; font-style: italic;">"{reflection}"</p>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <p style="color: #6b7280; font-size: 14px;">
-                    You've completed <strong>{participant.day30_completed_days}</strong> out of 30 days.<br>
-                    Keep going — consistency is the key to transformation!
-                </p>
-            </div>
-        </div>
-        
-        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-            <p>MAYO — NYS IDP Learning Management System</p>
-            <p>Participant ID: {participant.participant_id}</p>
-        </div>
-    </div>
-    """
-    
-    subject = f"Day {day} Complete: {day_data['title']} — MAYO NYS IDP"
-    return subject, html
-
-def build_final_report_email(participant: Participant, db) -> tuple:
-    """Build the comprehensive final report email after Day 30."""
-    
-    # Get all daily responses
-    daily_responses = db.query(DailyResponse).filter(
-        DailyResponse.participant_id == participant.participant_id
-    ).order_by(DailyResponse.day).all()
-    
-    # Get quiz results
-    quizzes = db.query(QuizResponse).filter(
-        QuizResponse.participant_id == participant.participant_id
-    ).order_by(QuizResponse.week).all()
-    
-    # Extract 90-day plan from Day 29
-    day_29_response = next((r for r in daily_responses if r.day == 29), None)
-    day_30_response = next((r for r in daily_responses if r.day == 30), None)
-    
-    # Build HTML email
-    html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #f9fafb;">
-        <div style="background: linear-gradient(135deg, #1f2937 0%, #3b82f6 100%); color: white; padding: 30px; text-align: center;">
-            <h1 style="margin: 0; font-size: 28px;">🎉 Congratulations, {participant.full_name}!</h1>
-            <p style="margin: 10px 0 0 0; font-size: 18px;">You've completed the 30-Day Challenge</p>
-        </div>
-        
-        <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
-            <h2 style="color: #1f2937;">📊 Your Final Progress Report</h2>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
-                <div style="background: #eff6ff; padding: 15px; border-radius: 8px; text-align: center;">
-                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Overall Progress</p>
-                    <p style="color: #1e40af; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.overall_progress_pct:.1f}%</p>
-                </div>
-                <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; text-align: center;">
-                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Days Completed</p>
-                    <p style="color: #166534; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.day30_completed_days}/30</p>
-                </div>
-                <div style="background: #faf5ff; padding: 15px; border-radius: 8px; text-align: center;">
-                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Quiz Average</p>
-                    <p style="color: #6b21a8; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.overall_quiz_pct:.1f}%</p>
-                </div>
-            </div>
-            
-            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <p style="color: #92400e; margin: 0;"><strong>Status:</strong> {participant.risk_status}</p>
-            </div>
-            
-            <h3 style="color: #1f2937; margin-top: 30px;">📘 Weekly Quiz Results</h3>
-            <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-                <tr style="background: #f3f4f6;">
-                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Week</th>
-                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Score</th>
-                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Percentage</th>
-                </tr>
-    """
-    
-    week_names = {1: "Discover", 2: "Build Mindset", 3: "Turn Ideas Into Plans", 4: "Execute & Persist"}
-    for week_num in range(1, 5):
-        quiz = next((q for q in quizzes if q.week == week_num), None)
-        if quiz:
-            html += f"""
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
-                    <td style="padding: 10px; border: 1px solid #d1d5db;">{quiz.score}/{quiz.max_score}</td>
-                    <td style="padding: 10px; border: 1px solid #d1d5db; font-weight: bold;">{quiz.percentage:.1f}%</td>
-                </tr>
-            """
-        else:
-            html += f"""
-                <tr style="background: #fef2f2;">
-                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
-                    <td style="padding: 10px; border: 1px solid #d1d5db;" colspan="2">Not completed</td>
-                </tr>
-            """
-    
-    html += """
-            </table>
-            
-            <h3 style="color: #1f2937; margin-top: 30px;">📅 Your 30-Day Journey</h3>
-            <p style="color: #6b7280;">Here's a summary of each day you completed:</p>
-    """
-    
-    for response in daily_responses:
-        day_num = response.day
-        if day_num <= 30:
-            day_title = CURRICULUM[day_num]["title"]
-            html += f"""
-                <div style="background: #f9fafb; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3b82f6;">
-                    <p style="color: #1f2937; font-weight: bold; margin: 0 0 10px 0;">Day {day_num}: {day_title}</p>
-                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px;"><strong>Action Status:</strong> {response.action_status}</p>
-                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px; font-style: italic;"><strong>Reflection:</strong> {response.reflection}</p>
-                </div>
-            """
-    
-    # Add 90-day plan if Day 29 was completed
-    if day_29_response:
-        responses_json = json.loads(day_29_response.responses_json)
-        html += f"""
-            <h3 style="color: #1f2937; margin-top: 30px;">🎯 Your 90-Day Action Plan</h3>
-            <p style="color: #6b7280;">Based on your Day 29 responses, here's your personalized 90-day plan:</p>
-            
-            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-                <h4 style="color: #065f46; margin-top: 0;">Goal 1</h4>
-                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g1', 'Not specified')}</p>
-            </div>
-            
-            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-                <h4 style="color: #065f46; margin-top: 0;">Goal 2</h4>
-                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g2', 'Not specified')}</p>
-            </div>
-            
-            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-                <h4 style="color: #065f46; margin-top: 0;">Goal 3</h4>
-                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g3', 'Not specified')}</p>
-            </div>
-        """
-    
-    # Add final commitment if Day 30 was completed
-    if day_30_response:
-        responses_json = json.loads(day_30_response.responses_json)
-        html += f"""
-            <h3 style="color: #1f2937; margin-top: 30px;">💎 Your Final Commitment</h3>
-            <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                <p style="color: #374151; font-style: italic; white-space: pre-wrap; margin: 0;">"{responses_json.get('q_final_commit', 'Not specified')}"</p>
-            </div>
-        """
-    
-    html += f"""
-            <div style="text-align: center; margin: 40px 0; padding: 30px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 8px; color: white;">
-                <h3 style="margin-top: 0;">🚀 Your Journey Continues</h3>
-                <p style="margin: 10px 0;">You've built the foundation. Now it's time to execute your 90-day plan with the same discipline and commitment.</p>
-                <p style="margin: 10px 0; font-weight: bold;">Remember: Success is not a destination, it's a journey.</p>
-            </div>
-        </div>
-        
-        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-            <p>MAYO — NYS IDP Learning Management System</p>
-            <p>Participant ID: {participant.participant_id}</p>
-            <p>This report was generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
-        </div>
-    </div>
-    """
-    
-    subject = f"🎉 Your 30-Day Challenge Final Report — MAYO NYS IDP"
-    return subject, html
-
-# ==========================================
-# MANUAL FINAL REPORT GENERATION (for facilitators)
-# ==========================================
-@app.get("/send-final-report/{pid}")
-def send_final_report_manual(pid: str, db = Depends(get_db)):
-    """Manually trigger final report email for a participant"""
-    p = db.query(Participant).filter(Participant.participant_id == pid.upper()).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Participant not found")
-    
-    if not p.email:
-        return {"error": "Participant has no email address"}
-    
-    subject, html_content = build_final_report_email(p, db)
-    success = send_email(p.email, subject, html_content)
-    
-    if success:
-        return {"message": f"Final report sent to {p.email}"}
+    reflection = form_data.get("reflection", "")
+    evidence_file = form_data.get("evidence_file")
+    filename = evidence_file.filename if evidence_file and hasattr(evidence_file, 'filename') and evidence_file.filename else None
+    existing = db.query(DailyResponse).filter(DailyResponse.participant_id == pid, DailyResponse.day == day).first()
+    if existing:
+        existing.responses_json, existing.action_status, existing.reflection = json.dumps(responses), action_status, reflection
+        if filename: existing.evidence_file = filename
     else:
-        return {"error": "Failed to send email. Check logs."}
+        db.add(DailyResponse(participant_id=pid, day=day, responses_json=json.dumps(responses), action_status=action_status, reflection=reflection, evidence_file=filename))
+    db.commit(); update_participant_progress(db, pid)
+    if p.email and day in CURRICULUM:
+        subject, html_content = build_daily_action_email(p, day, CURRICULUM[day], form_data)
+        send_email(p.email, subject, html_content)
+    if day == 30:
+        subject, html_content = build_final_report_email(p, db)
+        send_email(p.email, subject, html_content)
+    next_day = day + 1
+    return RedirectResponse(url=f"/daily-action/{next_day}" if next_day <= 30 else "/my-progress", status_code=303)
 
 # ==========================================
-# FACILITATOR DASHBOARD (Admin Only)
+# FACILITATOR & INIT ROUTES
 # ==========================================
 @app.get("/facilitator", response_class=HTMLResponse)
 def facilitator_dashboard(request: Request, db = Depends(get_db)):
     total = db.query(Participant).count()
     completed = db.query(Participant).filter(Participant.final_idp_complete == True).count()
-    
     risk_counts = db.query(Participant.risk_status, func.count(Participant.id)).group_by(Participant.risk_status).all()
     risk_dict = {status: count for status, count in risk_counts}
-    
     participants = db.query(Participant).all()
     priority = {"At Risk": 1, "Needs Attention": 2, "Not Started": 3, "On Track": 4, "Completed": 5}
     participants.sort(key=lambda x: priority.get(x.risk_status, 6))
-    
-    return templates.TemplateResponse(
-        request=request, 
-        name="facilitator_dashboard.html", 
-        context={
-            "total": total, 
-            "completed": completed,
-            "risk_dict": risk_dict, 
-            "participants": participants
-        }
-    )
-
-# ==========================================
-# INIT & SEED
-# ==========================================
+    return templates.TemplateResponse(request=request, name="facilitator_dashboard.html", context={"total": total, "completed": completed, "risk_dict": risk_dict, "participants": participants})
 
 @app.get("/init-db")
 def init_db(db = Depends(get_db)):
     Base.metadata.create_all(bind=engine)
     return {"message": "Database tables created successfully!"}
-# ==========================================
-# DEBUG & SEED ROUTES
-# ==========================================
+
 @app.get("/debug-db")
 def debug_db(db = Depends(get_db)):
-    """Use this to check if questions are actually in the database"""
     total = db.query(Question).count()
     week1_count = db.query(Question).filter(Question.chapter.in_([1, 2, 3, 4])).count()
     sample = db.query(Question).first()
-    
-    return {
-        "total_questions_in_db": total,
-        "week_1_questions_count": week1_count,
-        "sample_question_chapter": sample.chapter if sample else "NONE (Database is empty!)"
-    }
+    return {"total_questions_in_db": total, "week_1_questions_count": week1_count, "sample_question_chapter": sample.chapter if sample else "NONE"}
 
 @app.get("/seed-questions")
 def seed_questions(db = Depends(get_db)):
@@ -1219,3 +763,78 @@ def seed_questions(db = Depends(get_db)):
     
     db.commit()
     return {"message": f"Successfully seeded all {len(raw_questions)} questions!"}
+# ==========================================
+# NEMISA DIGITAL SKILLS LAYER
+# ==========================================
+NEMISA_COURSES_DATA = [
+    (1, "GH-900", "GitHub Foundations", "Foundation", 2), (2, "PL-900", "Microsoft Power Platform Fundamentals", "Foundation", 2),
+    (3, "AB-730", "AI Business Professional", "AI / Business", 2), (4, "AB-731", "AI Transformation Leader", "AI / Business", 2),
+    (5, "COPILOT", "Microsoft 365 Copilot & Agent Admin Fundamentals", "AI / Productivity", 2), (6, "POWER-BI", "Microsoft Certified: Power BI Data Analyst Associate", "Data", 3),
+    (7, "AZURE-AI", "Microsoft Certified: Azure AI Engineer Associate", "AI / Technical", 3), (8, "AZURE-DEV", "Microsoft Certified: Azure Developer Associate", "Development", 3),
+    (9, "AZ-305", "Designing Microsoft Azure Infrastructure Solutions", "Architecture", 3), (10, "SEC-OPS", "Microsoft Certified: Security Operations Analyst Associate", "Security", 2),
+    (11, "CYBER-ARCH", "Microsoft Certified: Cybersecurity Architect Expert", "Security Architecture", 3), (12, "DEVOPS", "Microsoft Certified: DevOps Engineer Expert", "DevOps", 3),
+]
+
+@app.get("/seed-nemisa")
+def seed_nemisa(db = Depends(get_db)):
+    if db.query(NemisaCourse).count() >= 12: return {"message": "NEMISA courses already seeded."}
+    for seq, code, name, track, weeks in NEMISA_COURSES_DATA:
+        db.add(NemisaCourse(sequence=seq, code=code, name=name, track=track, target_weeks=weeks))
+    db.commit()
+    return {"message": "Successfully seeded 12 NEMISA courses!"}
+
+def update_nemisa_sequence(db, participant_id: str):
+    assignments = db.query(NemisaAssignment).filter(NemisaAssignment.participant_id == participant_id).order_by(NemisaAssignment.sequence).all()
+    for i, assignment in enumerate(assignments):
+        if assignment.progress_pct >= 100 and assignment.status != "COMPLETED":
+            assignment.status, assignment.completion_date = "COMPLETED", datetime.utcnow()
+            if i + 1 < len(assignments):
+                next_course = assignments[i + 1]
+                if next_course.status == "NOT STARTED":
+                    next_course.status, next_course.start_date = "ACTIVE", datetime.utcnow()
+                    next_course.target_date = datetime.utcnow() + timedelta(weeks=next_course.target_weeks)
+    db.commit()
+
+@app.get("/nemisa", response_class=HTMLResponse)
+def nemisa_command_centre(request: Request, db = Depends(get_db)): return templates.TemplateResponse(request=request, name="nemisa_command.html", context={})
+
+@app.get("/api/nemisa/{pid}")
+def get_nemisa_data(pid: str, db = Depends(get_db)):
+    p = db.query(Participant).filter(Participant.participant_id == pid.upper()).first()
+    if not p: raise HTTPException(status_code=404, detail="Participant not found")
+    assignments = db.query(NemisaAssignment).filter(NemisaAssignment.participant_id == pid.upper()).order_by(NemisaAssignment.sequence).all()
+    reports = db.query(NemisaWeeklyReport).filter(NemisaWeeklyReport.participant_id == pid.upper()).order_by(NemisaWeeklyReport.week_number.desc()).all()
+    completed_count = sum(1 for a in assignments if a.status == "COMPLETED")
+    active_assignment = next((a for a in assignments if a.status == "ACTIVE"), None)
+    return {
+        "participant": {"id": p.participant_id, "name": p.full_name, "email": p.email, "status": p.risk_status},
+        "progress": {"overall_pct": int((completed_count / 12) * 100) if completed_count > 0 else 0, "completed": completed_count, "remaining": 12 - completed_count, "current_course": active_assignment.course_code if active_assignment else "None", "current_progress": active_assignment.progress_pct if active_assignment else 0, "days_remaining": (active_assignment.target_date - datetime.utcnow()).days if active_assignment and active_assignment.target_date else 0},
+        "journey": [{"sequence": a.sequence, "code": a.course_code, "name": db.query(NemisaCourse).filter(NemisaCourse.code == a.course_code).first().name if a.course_code else "Unknown", "status": a.status, "progress": a.progress_pct, "exam_passed": a.exam_passed} for a in assignments],
+        "last_report": reports[0].timestamp.strftime("%Y-%m-%d") if reports else "Never"
+    }
+
+@app.get("/nemisa/report", response_class=HTMLResponse)
+def nemisa_report_form(request: Request): return templates.TemplateResponse(request=request, name="nemisa_report.html", context={})
+
+@app.post("/nemisa/report")
+async def submit_nemisa_report(request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    p = db.query(Participant).filter(Participant.participant_id == pid).first()
+    if not p: raise HTTPException(status_code=404, detail="Participant not found")
+    active_assignment = db.query(NemisaAssignment).filter(NemisaAssignment.participant_id == pid, NemisaAssignment.status == "ACTIVE").first()
+    course_code = active_assignment.course_code if active_assignment else "GENERAL"
+    if active_assignment:
+        active_assignment.progress_pct = int(form_data.get("progress_pct", 0))
+        update_nemisa_sequence(db, pid)
+    db.add(NemisaWeeklyReport(participant_id=pid, week_number=int(form_data.get("week_number", 1)), course_code=course_code, accessed_nemisa=form_data.get("accessed") == "Yes", target_met=form_data.get("target_met", "No"), progress_pct=int(form_data.get("progress_pct", 0)), learnings=form_data.get("learnings", ""), practical_activity=form_data.get("practical", ""), blockers=form_data.get("blockers", ""), support_needed=form_data.get("support", "")))
+    db.commit()
+    send_email(p.email, f"NEMISA Weekly Report Submitted - Week {form_data.get('week_number')}", f"<div style='font-family: Arial; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd;'><h2 style='color: #3b82f6;'>✅ NEMISA Weekly Report Received</h2><p>Hi {p.full_name},</p><p>Thank you for submitting your Week {form_data.get('week_number')} report for <strong>{course_code}</strong>.</p><p><strong>Progress:</strong> {form_data.get('progress_pct')}%</p><p>Keep up the 3-2-1 rhythm!</p></div>")
+    return RedirectResponse(url="/nemisa", status_code=303)
+
+@app.get("/send-final-report/{pid}")
+def send_final_report_manual(pid: str, db = Depends(get_db)):
+    p = db.query(Participant).filter(Participant.participant_id == pid.upper()).first()
+    if not p or not p.email: raise HTTPException(status_code=404, detail="Participant not found or no email")
+    success = send_email(p.email, *build_final_report_email(p, db))
+    return {"message": f"Final report sent to {p.email}"} if success else {"error": "Failed to send email."}
