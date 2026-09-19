@@ -352,34 +352,45 @@ def learner_dashboard(request: Request):
 
 @app.get("/api/learner-dashboard/{pid}")
 def get_learner_dashboard_data(pid: str, db = Depends(get_db)):
-    p = db.query(Participant).filter(Participant.participant_id == pid.upper()).first()
-    if not p: raise HTTPException(status_code=404, detail="Participant not found")
-    
-    enrollments = db.query(Enrollment).filter(Enrollment.participant_id == pid.upper()).all()
-    courses_data = []
-    
-    for e in enrollments:
-        course = db.query(Course).filter(Course.code == e.course_code).first()
-        if e.course_code == "NYS-IDP":
-            progress = p.overall_progress_pct
-        elif e.course_code == "NEMISA-DIGITAL":
-            nemisa_assignments = db.query(NemisaAssignment).filter(NemisaAssignment.participant_id == pid.upper()).all()
-            completed = sum(1 for a in nemisa_assignments if a.status == "COMPLETED")
-            progress = int((completed / 12) * 100) if completed > 0 else 0
-            e.progress_pct = progress
-            db.commit()
-        else:
-            progress = e.progress_pct
-            
-        courses_data.append({
-            "code": e.course_code,
-            "title": course.title if course else e.course_code,
-            "description": course.description if course else "",
-            "progress": progress,
-            "status": e.status
-        })
+    try:
+        pid = pid.upper().strip()
+        p = db.query(Participant).filter(Participant.participant_id == pid).first()
+        if not p: 
+            raise HTTPException(status_code=404, detail="Participant not found")
         
-    return {"participant": {"id": p.participant_id, "name": p.full_name}, "courses": courses_data}
+        enrollments = db.query(Enrollment).filter(Enrollment.participant_id == pid).all()
+        courses_data = []
+        
+        for e in enrollments:
+            course = db.query(Course).filter(Course.code == e.course_code).first()
+            
+            if e.course_code == "NYS-IDP":
+                progress = float(p.overall_progress_pct or 0.0)
+            elif e.course_code == "NEMISA-DIGITAL":
+                nemisa_assignments = db.query(NemisaAssignment).filter(NemisaAssignment.participant_id == pid).all()
+                completed = sum(1 for a in nemisa_assignments if a.status == "COMPLETED")
+                progress = float(int((completed / 12) * 100)) if completed > 0 else 0.0
+                e.progress_pct = progress
+                db.commit()
+            else:
+                progress = float(e.progress_pct or 0.0)
+                
+            courses_data.append({
+                "code": e.course_code,
+                "title": course.title if course else e.course_code,
+                "description": course.description if course else "Digital Skills Learning Path",
+                "progress": progress,
+                "status": e.status
+            })
+            
+        return {"participant": {"id": p.participant_id, "name": p.full_name}, "courses": courses_data}
+        
+    except Exception as e:
+        # This will print the exact error to your Render logs so we can see it
+        import traceback
+        print(f"❌ DASHBOARD API ERROR for {pid}: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal API Error: {str(e)}")
 
 @app.get("/my-progress", response_class=HTMLResponse)
 def nys_idp_progress(request: Request): 
@@ -821,3 +832,23 @@ async def submit_nemisa_report(request: Request, db = Depends(get_db)):
     db.commit()
     send_email(p.email, f"NEMISA Weekly Report Submitted - Week {form_data.get('week_number')}", f"<div style='font-family: Arial; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd;'><h2 style='color: #3b82f6;'>✅ NEMISA Weekly Report Received</h2><p>Hi {p.full_name},</p><p>Thank you for submitting your Week {form_data.get('week_number')} report for <strong>{course_code}</strong>.</p><p><strong>Progress:</strong> {form_data.get('progress_pct')}%</p><p>Keep up the 3-2-1 rhythm!</p></div>")
     return RedirectResponse(url="/nemisa", status_code=303)
+
+@app.get("/fix-enrollment/{pid}")
+def fix_enrollment(pid: str, db = Depends(get_db)):
+    """Temporarily enroll an existing participant in both courses"""
+    pid = pid.upper().strip()
+    p = db.query(Participant).filter(Participant.participant_id == pid).first()
+    if not p:
+        return {"error": "Participant not found"}
+    
+    # Check if already enrolled
+    existing = db.query(Enrollment).filter(Enrollment.participant_id == pid).count()
+    if existing > 0:
+        return {"message": f"Participant {pid} is already enrolled in {existing} courses."}
+    
+    # Enroll in both
+    db.add(Enrollment(participant_id=pid, course_code="NYS-IDP", progress_pct=0.0))
+    db.add(Enrollment(participant_id=pid, course_code="NEMISA-DIGITAL", progress_pct=0.0))
+    db.commit()
+    
+    return {"message": f"Success! Participant {pid} has been enrolled in both courses."}
