@@ -40,6 +40,25 @@ class Participant(Base):
     
     daily_responses = relationship("DailyResponse", back_populates="participant")
     nemisa_assignments = relationship("NemisaAssignment", back_populates="participant")
+    enrollments = relationship("Enrollment", back_populates="participant") # NEW
+
+class Course(Base): # NEW
+    __tablename__ = "courses"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True)
+    title = Column(String)
+    description = Column(String)
+
+class Enrollment(Base): # NEW
+    __tablename__ = "enrollments"
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(String, ForeignKey("participants.participant_id"))
+    course_code = Column(String, ForeignKey("courses.code"))
+    enrolled_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="Active")
+    progress_pct = Column(Float, default=0.0)
+    
+    participant = relationship("Participant", back_populates="enrollments")
 
 class Question(Base):
     __tablename__ = "questions"
@@ -74,7 +93,6 @@ class DailyResponse(Base):
     reflection = Column(String)
     evidence_file = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    
     participant = relationship("Participant", back_populates="daily_responses")
 
 class NemisaCourse(Base):
@@ -91,7 +109,7 @@ class NemisaAssignment(Base):
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
     course_code = Column(String, ForeignKey("nemisa_courses.code"))
-    sequence = Column(Integer, default=1)  # <-- THIS WAS MISSING
+    sequence = Column(Integer, default=1)
     status = Column(String, default="NOT STARTED")
     progress_pct = Column(Integer, default=0)
     start_date = Column(DateTime, nullable=True)
@@ -99,7 +117,6 @@ class NemisaAssignment(Base):
     completion_date = Column(DateTime, nullable=True)
     exam_booked = Column(Boolean, default=False)
     exam_passed = Column(Boolean, default=False)
-    
     participant = relationship("Participant", back_populates="nemisa_assignments")
 
 class NemisaWeeklyReport(Base):
@@ -116,3 +133,4 @@ class NemisaWeeklyReport(Base):
     blockers = Column(String)
     support_needed = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    
