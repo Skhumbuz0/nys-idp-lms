@@ -91,6 +91,7 @@ class NemisaAssignment(Base):
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
     course_code = Column(String, ForeignKey("nemisa_courses.code"))
+    sequence = Column(Integer, default=1)  # <-- THIS WAS MISSING
     status = Column(String, default="NOT STARTED")
     progress_pct = Column(Integer, default=0)
     start_date = Column(DateTime, nullable=True)
