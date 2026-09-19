@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NYS IDP LMS - MAYO</title>
+    <title>MAYO Learner Management System</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans flex flex-col min-h-screen">
@@ -11,13 +11,20 @@
     <nav class="bg-gray-900 text-white p-4 shadow-md">
         <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             
+            <!-- Logo & App Title -->
             <div class="flex items-center gap-3">
                 <img src="/static/mayo-logo.png" alt="MAYO Logo" class="h-10 w-auto bg-white rounded p-1 shadow-sm" onerror="this.style.display='none'">
                 <div class="h-8 w-px bg-gray-600 hidden sm:block"></div>
-                <h1 class="text-lg font-bold text-gray-100">NYS IDP — Think & Grow Rich</h1>
+                <h1 class="text-lg font-bold text-gray-100">MAYO Learner Management System</h1>
             </div>
             
-            <!-- LEARNER NAVIGATION -->
+            <!-- GUEST NAVIGATION (Hidden by default, shown via JS if not logged in) -->
+            <div id="guest-nav" class="hidden flex flex-wrap justify-center gap-4 text-sm sm:text-base">
+                <a href="/" class="hover:text-blue-300 transition">🏠 Home</a>
+                <a href="/register" class="hover:text-blue-300 transition">📝 Register</a>
+            </div>
+
+            <!-- LEARNER NAVIGATION (Hidden by default) -->
             <div id="learner-nav" class="hidden flex flex-wrap justify-center gap-4 text-sm sm:text-base">
                 <a href="/learner-dashboard" class="hover:text-blue-300 font-semibold transition">🏠 My Courses</a>
                 <a href="/my-progress" class="hover:text-purple-300 transition">📘 NYS IDP</a>
@@ -25,25 +32,16 @@
                 <a href="/logout" class="hover:text-red-300 transition">🚪 Logout</a>
             </div>
             
-            <!-- FACILITATOR NAVIGATION -->
+            <!-- FACILITATOR NAVIGATION (Hidden by default) -->
             <div id="facilitator-nav" class="hidden flex flex-wrap justify-center gap-4 text-sm sm:text-base">
                 <a href="/" class="hover:text-blue-300 transition">🏠 Home</a>
                 <a href="/facilitator" class="hover:text-yellow-400 font-semibold transition">📋 Facilitator Dashboard</a>
                 <a href="/logout" class="hover:text-red-300 transition">🚪 Logout</a>
             </div>
-            
-            <!-- GUEST NAVIGATION -->
-            <div id="guest-nav" class="flex flex-wrap justify-center gap-4 text-sm sm:text-base">
-                <a href="/" class="hover:text-blue-300 transition">🏠 Home</a>
-                <a href="/register" class="hover:text-blue-300 transition">📝 Register</a>
-                <a href="/quizzes" class="hover:text-purple-300 transition">📘 Weekly Quizzes</a>
-                <a href="/login" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded transition font-semibold">🔑 Login</a>
-                <a href="/nemisa" class="hover:text-green-300 transition">💻 NEMISA Skills</a>
-            </div>
         </div>
         
-        <!-- User Banner -->
-        <div id="user-banner" class="hidden container mx-auto mt-3 bg-blue-800 text-white px-4 py-2 rounded text-sm">
+        <!-- User Banner (Hidden by default) -->
+        <div id="user-banner" class="hidden container mx-auto mt-3 bg-blue-800 text-white px-4 py-2 rounded text-sm text-center sm:text-left">
             <span id="role-badge" class="bg-blue-600 px-2 py-1 rounded text-xs font-bold mr-2"></span>
             Welcome, <strong id="user-name-display"></strong> 
             <span class="ml-2 bg-blue-600 px-2 py-1 rounded font-mono text-xs" id="user-id-display"></span>
@@ -55,14 +53,22 @@
     </main>
 
     <footer class="bg-gray-900 text-gray-400 text-center p-4 text-sm mt-auto border-t border-gray-800">
-        <p>&copy; 2026 MAYO. All rights reserved. | NYS IDP Learning Management System</p>
+        <p>&copy; 2026 MAYO. All rights reserved. | MAYO Learner Management System</p>
     </footer>
 
     <script>
+        // Check login state
         const role = localStorage.getItem('nys_role');
         const savedPid = localStorage.getItem('nys_participant_id');
         const savedName = localStorage.getItem('nys_participant_name');
         
+        // 1. Hide ALL navs first to prevent any duplicates
+        document.getElementById('guest-nav').classList.add('hidden');
+        document.getElementById('learner-nav').classList.add('hidden');
+        document.getElementById('facilitator-nav').classList.add('hidden');
+        document.getElementById('user-banner').classList.add('hidden');
+
+        // 2. Show ONLY the correct nav based on login state
         if (role === 'learner' && savedPid) {
             document.getElementById('learner-nav').classList.remove('hidden');
             document.getElementById('user-banner').classList.remove('hidden');
@@ -76,6 +82,7 @@
             document.getElementById('user-name-display').textContent = 'Admin';
             document.getElementById('user-id-display').style.display = 'none';
         } else {
+            // Default to guest
             document.getElementById('guest-nav').classList.remove('hidden');
         }
     </script>
