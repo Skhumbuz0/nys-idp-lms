@@ -852,3 +852,18 @@ def fix_enrollment(pid: str, db = Depends(get_db)):
     db.commit()
     
     return {"message": f"Success! Participant {pid} has been enrolled in both courses."}
+
+@app.get("/fix-db-schema")
+def fix_db_schema(db = Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        # This directly tells PostgreSQL to add the missing column
+        db.execute(text("ALTER TABLE nemisa_assignments ADD COLUMN sequence INTEGER DEFAULT 1"))
+        db.commit()
+        return {"message": "Success! Added missing 'sequence' column to the database."}
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e):
+             return {"message": "Column already exists. Database is fine!"}
+        return {"error": str(e)}
+    
