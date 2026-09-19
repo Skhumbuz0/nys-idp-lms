@@ -471,13 +471,39 @@ def facilitator_dashboard(request: Request, db = Depends(get_db)):
 
 @app.get("/init-db")
 def init_db(db = Depends(get_db)):
+    # 1. Create all tables (including the new Course and Enrollment tables)
     Base.metadata.create_all(bind=engine)
-    # Seed Courses if empty
+    
+    # 2. Seed the 2 main courses if the table is empty
     if db.query(Course).count() == 0:
-        db.add(Course(code="NYS-IDP", title="NYS IDP: Think & Grow Rich 30-Day Challenge", description="Master your mindset, build definite purpose, and take daily action over 30 days. Includes weekly knowledge quizzes."))
-        db.add(Course(code="NEMISA-DIGITAL", title="NEMISA Digital Skills Programme", description="A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."))
+        db.add(Course(
+            code="NYS-IDP", 
+            title="NYS IDP: Think & Grow Rich 30-Day Challenge", 
+            description="Master your mindset, build definite purpose, and take daily action over 30 days. Includes weekly knowledge quizzes."
+        ))
+        db.add(Course(
+            code="NEMISA-DIGITAL", 
+            title="NEMISA Digital Skills Programme", 
+            description="A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."
+        ))
         db.commit()
-    return {"message": "Database initialized and courses seeded!"}
+        print("✅ Courses seeded successfully.")
+    
+    # 3. Retroactively enroll any existing participants who registered before this feature was added
+    participants = db.query(Participant).all()
+    fixed_count = 0
+    for p in participants:
+        existing_enrollments = db.query(Enrollment).filter(Enrollment.participant_id == p.participant_id).count()
+        if existing_enrollments == 0:
+            db.add(Enrollment(participant_id=p.participant_id, course_code="NYS-IDP", progress_pct=0.0))
+            db.add(Enrollment(participant_id=p.participant_id, course_code="NEMISA-DIGITAL", progress_pct=0.0))
+            fixed_count += 1
+            
+    db.commit()
+    
+    return {
+        "message": f"Database initialized! Courses seeded. Retroactively enrolled {fixed_count} existing participants."
+    }
 
 @app.get("/seed-questions")
 def seed_questions(db = Depends(get_db)):
