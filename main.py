@@ -401,6 +401,36 @@ def nys_idp_progress(request: Request):
 def nemisa_command_centre(request: Request, db = Depends(get_db)): 
     return templates.TemplateResponse(request=request, name="nemisa_command.html", context={})
 
+@app.get("/api/participant/{pid}")
+def get_participant_api(pid: str, db = Depends(get_db)):
+    clean_pid = pid.strip().upper()
+    p = db.query(Participant).filter(Participant.participant_id == clean_pid).first()
+    
+    if not p:
+        # This will show up in the error message so we know exactly what it's looking for
+        raise HTTPException(status_code=404, detail=f"Participant '{clean_pid}' not found in database.")
+    
+    quizzes = db.query(QuizResponse).filter(QuizResponse.participant_id == clean_pid).all()
+    actions = db.query(DailyResponse).filter(DailyResponse.participant_id == clean_pid).all()
+    
+    return {
+        "participant_id": p.participant_id,
+        "full_name": p.full_name,
+        "email": p.email,
+        "overall_progress_pct": p.overall_progress_pct or 0,
+        "overall_quiz_pct": p.overall_quiz_pct or 0,
+        "day30_action_progress_pct": p.day30_action_progress_pct or 0,
+        "day30_completed_days": p.day30_completed_days or 0,
+        "day30_current_streak": p.day30_current_streak or 0,
+        "risk_status": p.risk_status or "Not Started",
+        "week1_complete": p.week1_complete,
+        "week2_complete": p.week2_complete,
+        "week3_complete": p.week3_complete,
+        "week4_complete": p.week4_complete,
+        "quizzes": [{"week": q.week, "score": q.score, "max_score": q.max_score, "percentage": q.percentage} for q in quizzes],
+        "completed_days": sorted(list(set(a.day for a in actions)))
+    }
+
 # ==========================================
 # QUIZ & DAILY ACTION ROUTES (Unchanged logic, just kept for NYS course)
 # ==========================================
@@ -866,4 +896,5 @@ def fix_db_schema(db = Depends(get_db)):
         if "already exists" in str(e):
              return {"message": "Column already exists. Database is fine!"}
         return {"error": str(e)}
+
     
