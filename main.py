@@ -11,13 +11,257 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from database import Base, engine, get_db
 from models import Participant, Question, QuizResponse, DailyResponse
+import resend
 
-app = FastAPI(title="NYS IDP LMS")
+aapp = FastAPI(title="NYS IDP LMS")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory=Path("templates"))
 
-# Admin password - change this to your own secret password
+# Admin password
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "MAYO2026!")
+
+# Email configuration
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "MAYO NYS IDP <onboarding@resend.dev>")
+
+# ==========================================
+# EMAIL UTILITIES
+# ==========================================
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Send an email using Resend. Returns True on success, False on failure."""
+    if not RESEND_API_KEY:
+        print(f"⚠️ WARNING: RESEND_API_KEY not set. Email to {to_email} not sent.")
+        return False
+    
+    try:
+        resend.api_key = RESEND_API_KEY
+        resend.Emails.send({
+            "from": FROM_EMAIL,
+            "to": to_email,
+            "subject": subject,
+            "html": html_content
+        })
+        print(f"✅ Email sent to {to_email}: {subject}")
+        return True
+    except Exception as e:
+        print(f"❌ Email error for {to_email}: {e}")
+        return False
+
+def build_daily_action_email(participant: Participant, day: int, day_data: dict, form_data: dict) -> tuple:
+    """Build the email content for a daily action submission."""
+    
+    # Extract questions and answers
+    qa_pairs = []
+    for q in day_data["questions"]:
+        q_id = q["id"]
+        answer = form_data.get(f"q_{q_id}", "No answer provided")
+        qa_pairs.append({"question": q["label"], "answer": answer})
+    
+    action_status = form_data.get("action_status", "No")
+    reflection = form_data.get("reflection", "No reflection provided")
+    
+    # Build HTML email
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb;">
+        <div style="background: #1f2937; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">MAYO — NYS IDP</h1>
+            <p style="margin: 5px 0 0 0; color: #9ca3af;">Think & Grow Rich 30-Day Challenge</p>
+        </div>
+        
+        <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
+            <h2 style="color: #1f2937; margin-top: 0;">🎯 Day {day} Complete: {day_data['title']}</h2>
+            <p style="color: #6b7280;">Hi {participant.full_name},</p>
+            <p style="color: #374151;">Great work completing Day {day}! Here's a summary of your responses:</p>
+            
+            <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #1e40af; margin-top: 0;">📝 Your Responses</h3>
+    """
+    
+    for qa in qa_pairs:
+        html += f"""
+                <div style="margin-bottom: 15px;">
+                    <p style="color: #374151; font-weight: bold; margin-bottom: 5px;">{qa['question']}</p>
+                    <p style="color: #6b7280; margin: 0; padding-left: 15px; border-left: 2px solid #d1d5db;">{qa['answer']}</p>
+                </div>
+        """
+    
+    html += f"""
+            </div>
+            
+            <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #166534; margin-top: 0;">🚀 Today's Action</h3>
+                <p style="color: #374151; margin: 5px 0;"><strong>Task:</strong> {day_data['action']}</p>
+                <p style="color: #374151; margin: 5px 0;"><strong>Status:</strong> {action_status}</p>
+            </div>
+            
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #92400e; margin-top: 0;">🔄 Your Reflection</h3>
+                <p style="color: #374151; margin: 0; font-style: italic;">"{reflection}"</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <p style="color: #6b7280; font-size: 14px;">
+                    You've completed <strong>{participant.day30_completed_days}</strong> out of 30 days.<br>
+                    Keep going — consistency is the key to transformation!
+                </p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+            <p>MAYO — NYS IDP Learning Management System</p>
+            <p>Participant ID: {participant.participant_id}</p>
+        </div>
+    </div>
+    """
+    
+    subject = f"Day {day} Complete: {day_data['title']} — MAYO NYS IDP"
+    return subject, html
+
+def build_final_report_email(participant: Participant, db) -> tuple:
+    """Build the comprehensive final report email after Day 30."""
+    
+    # Get all daily responses
+    daily_responses = db.query(DailyResponse).filter(
+        DailyResponse.participant_id == participant.participant_id
+    ).order_by(DailyResponse.day).all()
+    
+    # Get quiz results
+    quizzes = db.query(QuizResponse).filter(
+        QuizResponse.participant_id == participant.participant_id
+    ).order_by(QuizResponse.week).all()
+    
+    # Extract 90-day plan from Day 29
+    day_29_response = next((r for r in daily_responses if r.day == 29), None)
+    day_30_response = next((r for r in daily_responses if r.day == 30), None)
+    
+    # Build HTML email
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #f9fafb;">
+        <div style="background: linear-gradient(135deg, #1f2937 0%, #3b82f6 100%); color: white; padding: 30px; text-align: center;">
+            <h1 style="margin: 0; font-size: 28px;">🎉 Congratulations, {participant.full_name}!</h1>
+            <p style="margin: 10px 0 0 0; font-size: 18px;">You've completed the 30-Day Challenge</p>
+        </div>
+        
+        <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
+            <h2 style="color: #1f2937;">📊 Your Final Progress Report</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
+                <div style="background: #eff6ff; padding: 15px; border-radius: 8px; text-align: center;">
+                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Overall Progress</p>
+                    <p style="color: #1e40af; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.overall_progress_pct:.1f}%</p>
+                </div>
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; text-align: center;">
+                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Days Completed</p>
+                    <p style="color: #166534; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.day30_completed_days}/30</p>
+                </div>
+                <div style="background: #faf5ff; padding: 15px; border-radius: 8px; text-align: center;">
+                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Quiz Average</p>
+                    <p style="color: #6b21a8; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.overall_quiz_pct:.1f}%</p>
+                </div>
+            </div>
+            
+            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="color: #92400e; margin: 0;"><strong>Status:</strong> {participant.risk_status}</p>
+            </div>
+            
+            <h3 style="color: #1f2937; margin-top: 30px;">📘 Weekly Quiz Results</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                <tr style="background: #f3f4f6;">
+                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Week</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Score</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Percentage</th>
+                </tr>
+    """
+    
+    week_names = {1: "Discover", 2: "Build Mindset", 3: "Turn Ideas Into Plans", 4: "Execute & Persist"}
+    for week_num in range(1, 5):
+        quiz = next((q for q in quizzes if q.week == week_num), None)
+        if quiz:
+            html += f"""
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
+                    <td style="padding: 10px; border: 1px solid #d1d5db;">{quiz.score}/{quiz.max_score}</td>
+                    <td style="padding: 10px; border: 1px solid #d1d5db; font-weight: bold;">{quiz.percentage:.1f}%</td>
+                </tr>
+            """
+        else:
+            html += f"""
+                <tr style="background: #fef2f2;">
+                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
+                    <td style="padding: 10px; border: 1px solid #d1d5db;" colspan="2">Not completed</td>
+                </tr>
+            """
+    
+    html += """
+            </table>
+            
+            <h3 style="color: #1f2937; margin-top: 30px;">📅 Your 30-Day Journey</h3>
+            <p style="color: #6b7280;">Here's a summary of each day you completed:</p>
+    """
+    
+    for response in daily_responses:
+        day_num = response.day
+        if day_num <= 30:
+            day_title = CURRICULUM[day_num]["title"]
+            html += f"""
+                <div style="background: #f9fafb; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                    <p style="color: #1f2937; font-weight: bold; margin: 0 0 10px 0;">Day {day_num}: {day_title}</p>
+                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px;"><strong>Action Status:</strong> {response.action_status}</p>
+                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px; font-style: italic;"><strong>Reflection:</strong> {response.reflection}</p>
+                </div>
+            """
+    
+    # Add 90-day plan if Day 29 was completed
+    if day_29_response:
+        responses_json = json.loads(day_29_response.responses_json)
+        html += f"""
+            <h3 style="color: #1f2937; margin-top: 30px;">🎯 Your 90-Day Action Plan</h3>
+            <p style="color: #6b7280;">Based on your Day 29 responses, here's your personalized 90-day plan:</p>
+            
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <h4 style="color: #065f46; margin-top: 0;">Goal 1</h4>
+                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g1', 'Not specified')}</p>
+            </div>
+            
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <h4 style="color: #065f46; margin-top: 0;">Goal 2</h4>
+                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g2', 'Not specified')}</p>
+            </div>
+            
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <h4 style="color: #065f46; margin-top: 0;">Goal 3</h4>
+                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g3', 'Not specified')}</p>
+            </div>
+        """
+    
+    # Add final commitment if Day 30 was completed
+    if day_30_response:
+        responses_json = json.loads(day_30_response.responses_json)
+        html += f"""
+            <h3 style="color: #1f2937; margin-top: 30px;">💎 Your Final Commitment</h3>
+            <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <p style="color: #374151; font-style: italic; white-space: pre-wrap; margin: 0;">"{responses_json.get('q_final_commit', 'Not specified')}"</p>
+            </div>
+        """
+    
+    html += f"""
+            <div style="text-align: center; margin: 40px 0; padding: 30px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 8px; color: white;">
+                <h3 style="margin-top: 0;">🚀 Your Journey Continues</h3>
+                <p style="margin: 10px 0;">You've built the foundation. Now it's time to execute your 90-day plan with the same discipline and commitment.</p>
+                <p style="margin: 10px 0; font-weight: bold;">Remember: Success is not a destination, it's a journey.</p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+            <p>MAYO — NYS IDP Learning Management System</p>
+            <p>Participant ID: {participant.participant_id}</p>
+            <p>This report was generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+        </div>
+    </div>
+    """
+    
+    subject = f"🎉 Your 30-Day Challenge Final Report — MAYO NYS IDP"
+    return subject, html
 
 # ==========================================
 # THE 30-DAY CURRICULUM ENGINE
@@ -400,55 +644,276 @@ async def process_quiz(week: int, request: Request, db = Depends(get_db)):
 # ==========================================
 # DAILY ACTION ROUTES
 # ==========================================
-@app.get("/daily-action", response_class=HTMLResponse)
-def daily_action_hub(request: Request, db = Depends(get_db)):
-    return templates.TemplateResponse(request=request, name="daily_action_hub.html", context={"curriculum": CURRICULUM})
+app = FastAPI(title="NYS IDP LMS")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory=Path("templates"))
 
-@app.get("/daily-action/{day}", response_class=HTMLResponse)
-def daily_action_form(request: Request, day: int):
-    if day < 1 or day > 30:
-        raise HTTPException(status_code=404, detail="Day out of range")
-    return templates.TemplateResponse(request=request, name="daily_action.html", context={"day": day, "day_data": CURRICULUM[day]})
+# Admin password
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "MAYO2026!")
 
-@app.post("/daily-action/{day}")
-async def process_daily_action(day: int, request: Request, db = Depends(get_db)):
-    form_data = await request.form()
-    pid = str(form_data.get("participant_id", "")).strip().upper()
+# Email configuration
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "MAYO NYS IDP <onboarding@resend.dev>")
+
+# ==========================================
+# EMAIL UTILITIES
+# ==========================================
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Send an email using Resend. Returns True on success, False on failure."""
+    if not RESEND_API_KEY:
+        print(f"⚠️ WARNING: RESEND_API_KEY not set. Email to {to_email} not sent.")
+        return False
     
-    responses = {}
-    for key, value in form_data.items():
-        if key.startswith("q_"):
-            responses[key] = value
-            
+    try:
+        resend.api_key = RESEND_API_KEY
+        resend.Emails.send({
+            "from": FROM_EMAIL,
+            "to": to_email,
+            "subject": subject,
+            "html": html_content
+        })
+        print(f"✅ Email sent to {to_email}: {subject}")
+        return True
+    except Exception as e:
+        print(f"❌ Email error for {to_email}: {e}")
+        return False
+
+def build_daily_action_email(participant: Participant, day: int, day_data: dict, form_data: dict) -> tuple:
+    """Build the email content for a daily action submission."""
+    
+    # Extract questions and answers
+    qa_pairs = []
+    for q in day_data["questions"]:
+        q_id = q["id"]
+        answer = form_data.get(f"q_{q_id}", "No answer provided")
+        qa_pairs.append({"question": q["label"], "answer": answer})
+    
     action_status = form_data.get("action_status", "No")
-    reflection = form_data.get("reflection", "")
+    reflection = form_data.get("reflection", "No reflection provided")
     
-    evidence_file = form_data.get("evidence_file")
-    filename = None
-    if evidence_file and hasattr(evidence_file, 'filename') and evidence_file.filename:
-        filename = evidence_file.filename
-
-    existing = db.query(DailyResponse).filter(DailyResponse.participant_id == pid, DailyResponse.day == day).first()
-    
-    if existing:
-        existing.responses_json = json.dumps(responses)
-        existing.action_status = action_status
-        existing.reflection = reflection
-        if filename: existing.evidence_file = filename
-    else:
-        new_response = DailyResponse(
-            participant_id=pid, day=day, responses_json=json.dumps(responses),
-            action_status=action_status, reflection=reflection, evidence_file=filename
-        )
-        db.add(new_response)
+    # Build HTML email
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb;">
+        <div style="background: #1f2937; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">MAYO — NYS IDP</h1>
+            <p style="margin: 5px 0 0 0; color: #9ca3af;">Think & Grow Rich 30-Day Challenge</p>
+        </div>
         
-    db.commit()
-    update_participant_progress(db, pid)
+        <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
+            <h2 style="color: #1f2937; margin-top: 0;">🎯 Day {day} Complete: {day_data['title']}</h2>
+            <p style="color: #6b7280;">Hi {participant.full_name},</p>
+            <p style="color: #374151;">Great work completing Day {day}! Here's a summary of your responses:</p>
+            
+            <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #1e40af; margin-top: 0;">📝 Your Responses</h3>
+    """
     
-    next_day = day + 1
-    if next_day <= 30:
-        return RedirectResponse(url=f"/daily-action/{next_day}", status_code=303)
-    return RedirectResponse(url="/my-progress", status_code=303)
+    for qa in qa_pairs:
+        html += f"""
+                <div style="margin-bottom: 15px;">
+                    <p style="color: #374151; font-weight: bold; margin-bottom: 5px;">{qa['question']}</p>
+                    <p style="color: #6b7280; margin: 0; padding-left: 15px; border-left: 2px solid #d1d5db;">{qa['answer']}</p>
+                </div>
+        """
+    
+    html += f"""
+            </div>
+            
+            <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #166534; margin-top: 0;">🚀 Today's Action</h3>
+                <p style="color: #374151; margin: 5px 0;"><strong>Task:</strong> {day_data['action']}</p>
+                <p style="color: #374151; margin: 5px 0;"><strong>Status:</strong> {action_status}</p>
+            </div>
+            
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #92400e; margin-top: 0;">🔄 Your Reflection</h3>
+                <p style="color: #374151; margin: 0; font-style: italic;">"{reflection}"</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <p style="color: #6b7280; font-size: 14px;">
+                    You've completed <strong>{participant.day30_completed_days}</strong> out of 30 days.<br>
+                    Keep going — consistency is the key to transformation!
+                </p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+            <p>MAYO — NYS IDP Learning Management System</p>
+            <p>Participant ID: {participant.participant_id}</p>
+        </div>
+    </div>
+    """
+    
+    subject = f"Day {day} Complete: {day_data['title']} — MAYO NYS IDP"
+    return subject, html
+
+def build_final_report_email(participant: Participant, db) -> tuple:
+    """Build the comprehensive final report email after Day 30."""
+    
+    # Get all daily responses
+    daily_responses = db.query(DailyResponse).filter(
+        DailyResponse.participant_id == participant.participant_id
+    ).order_by(DailyResponse.day).all()
+    
+    # Get quiz results
+    quizzes = db.query(QuizResponse).filter(
+        QuizResponse.participant_id == participant.participant_id
+    ).order_by(QuizResponse.week).all()
+    
+    # Extract 90-day plan from Day 29
+    day_29_response = next((r for r in daily_responses if r.day == 29), None)
+    day_30_response = next((r for r in daily_responses if r.day == 30), None)
+    
+    # Build HTML email
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #f9fafb;">
+        <div style="background: linear-gradient(135deg, #1f2937 0%, #3b82f6 100%); color: white; padding: 30px; text-align: center;">
+            <h1 style="margin: 0; font-size: 28px;">🎉 Congratulations, {participant.full_name}!</h1>
+            <p style="margin: 10px 0 0 0; font-size: 18px;">You've completed the 30-Day Challenge</p>
+        </div>
+        
+        <div style="background: white; padding: 30px; margin: 20px; border-radius: 8px;">
+            <h2 style="color: #1f2937;">📊 Your Final Progress Report</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
+                <div style="background: #eff6ff; padding: 15px; border-radius: 8px; text-align: center;">
+                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Overall Progress</p>
+                    <p style="color: #1e40af; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.overall_progress_pct:.1f}%</p>
+                </div>
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; text-align: center;">
+                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Days Completed</p>
+                    <p style="color: #166534; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.day30_completed_days}/30</p>
+                </div>
+                <div style="background: #faf5ff; padding: 15px; border-radius: 8px; text-align: center;">
+                    <p style="color: #6b7280; margin: 0; font-size: 12px;">Quiz Average</p>
+                    <p style="color: #6b21a8; margin: 5px 0 0 0; font-size: 24px; font-weight: bold;">{participant.overall_quiz_pct:.1f}%</p>
+                </div>
+            </div>
+            
+            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="color: #92400e; margin: 0;"><strong>Status:</strong> {participant.risk_status}</p>
+            </div>
+            
+            <h3 style="color: #1f2937; margin-top: 30px;">📘 Weekly Quiz Results</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                <tr style="background: #f3f4f6;">
+                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Week</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Score</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">Percentage</th>
+                </tr>
+    """
+    
+    week_names = {1: "Discover", 2: "Build Mindset", 3: "Turn Ideas Into Plans", 4: "Execute & Persist"}
+    for week_num in range(1, 5):
+        quiz = next((q for q in quizzes if q.week == week_num), None)
+        if quiz:
+            html += f"""
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
+                    <td style="padding: 10px; border: 1px solid #d1d5db;">{quiz.score}/{quiz.max_score}</td>
+                    <td style="padding: 10px; border: 1px solid #d1d5db; font-weight: bold;">{quiz.percentage:.1f}%</td>
+                </tr>
+            """
+        else:
+            html += f"""
+                <tr style="background: #fef2f2;">
+                    <td style="padding: 10px; border: 1px solid #d1d5db;">Week {week_num}: {week_names[week_num]}</td>
+                    <td style="padding: 10px; border: 1px solid #d1d5db;" colspan="2">Not completed</td>
+                </tr>
+            """
+    
+    html += """
+            </table>
+            
+            <h3 style="color: #1f2937; margin-top: 30px;">📅 Your 30-Day Journey</h3>
+            <p style="color: #6b7280;">Here's a summary of each day you completed:</p>
+    """
+    
+    for response in daily_responses:
+        day_num = response.day
+        if day_num <= 30:
+            day_title = CURRICULUM[day_num]["title"]
+            html += f"""
+                <div style="background: #f9fafb; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                    <p style="color: #1f2937; font-weight: bold; margin: 0 0 10px 0;">Day {day_num}: {day_title}</p>
+                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px;"><strong>Action Status:</strong> {response.action_status}</p>
+                    <p style="color: #6b7280; margin: 5px 0; font-size: 14px; font-style: italic;"><strong>Reflection:</strong> {response.reflection}</p>
+                </div>
+            """
+    
+    # Add 90-day plan if Day 29 was completed
+    if day_29_response:
+        responses_json = json.loads(day_29_response.responses_json)
+        html += f"""
+            <h3 style="color: #1f2937; margin-top: 30px;">🎯 Your 90-Day Action Plan</h3>
+            <p style="color: #6b7280;">Based on your Day 29 responses, here's your personalized 90-day plan:</p>
+            
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <h4 style="color: #065f46; margin-top: 0;">Goal 1</h4>
+                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g1', 'Not specified')}</p>
+            </div>
+            
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <h4 style="color: #065f46; margin-top: 0;">Goal 2</h4>
+                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g2', 'Not specified')}</p>
+            </div>
+            
+            <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <h4 style="color: #065f46; margin-top: 0;">Goal 3</h4>
+                <p style="color: #374151; white-space: pre-wrap; margin: 10px 0;">{responses_json.get('q_90_g3', 'Not specified')}</p>
+            </div>
+        """
+    
+    # Add final commitment if Day 30 was completed
+    if day_30_response:
+        responses_json = json.loads(day_30_response.responses_json)
+        html += f"""
+            <h3 style="color: #1f2937; margin-top: 30px;">💎 Your Final Commitment</h3>
+            <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <p style="color: #374151; font-style: italic; white-space: pre-wrap; margin: 0;">"{responses_json.get('q_final_commit', 'Not specified')}"</p>
+            </div>
+        """
+    
+    html += f"""
+            <div style="text-align: center; margin: 40px 0; padding: 30px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 8px; color: white;">
+                <h3 style="margin-top: 0;">🚀 Your Journey Continues</h3>
+                <p style="margin: 10px 0;">You've built the foundation. Now it's time to execute your 90-day plan with the same discipline and commitment.</p>
+                <p style="margin: 10px 0; font-weight: bold;">Remember: Success is not a destination, it's a journey.</p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+            <p>MAYO — NYS IDP Learning Management System</p>
+            <p>Participant ID: {participant.participant_id}</p>
+            <p>This report was generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+        </div>
+    </div>
+    """
+    
+    subject = f"🎉 Your 30-Day Challenge Final Report — MAYO NYS IDP"
+    return subject, html
+
+# ==========================================
+# MANUAL FINAL REPORT GENERATION (for facilitators)
+# ==========================================
+@app.get("/send-final-report/{pid}")
+def send_final_report_manual(pid: str, db = Depends(get_db)):
+    """Manually trigger final report email for a participant"""
+    p = db.query(Participant).filter(Participant.participant_id == pid.upper()).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    
+    if not p.email:
+        return {"error": "Participant has no email address"}
+    
+    subject, html_content = build_final_report_email(p, db)
+    success = send_email(p.email, subject, html_content)
+    
+    if success:
+        return {"message": f"Final report sent to {p.email}"}
+    else:
+        return {"error": "Failed to send email. Check logs."}
 
 # ==========================================
 # FACILITATOR DASHBOARD (Admin Only)
