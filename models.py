@@ -40,9 +40,8 @@ class Participant(Base):
     
     daily_responses = relationship("DailyResponse", back_populates="participant")
     nemisa_assignments = relationship("NemisaAssignment", back_populates="participant")
-    enrollments = relationship("Enrollment", back_populates="participant") # NEW
-
-    ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant")
+    enrollments = relationship("Enrollment", back_populates="participant")
+    ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant") # <-- MAKE SURE THIS IS HERE
 
 class Course(Base): # NEW
     __tablename__ = "courses"
@@ -143,7 +142,7 @@ class AIFluencyProgress(Base):
     module_code = Column(String)
     module_name = Column(String)
     completed = Column(Boolean, default=False)
-    evidence = Column(String, nullable=True)  # Text description of the project/evidence
+    evidence = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
     
-    participant = relationship("Participant")
+    participant = relationship("Participant", back_populates="ai_fluency_progress")

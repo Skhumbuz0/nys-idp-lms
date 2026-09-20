@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from database import Base, engine, get_db
-from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport, Course, Enrollment
+from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport, Course, Enrollment, AIFluencyProgress
 import smtplib
 from email.message import EmailMessage
 
