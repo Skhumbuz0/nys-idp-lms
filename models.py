@@ -43,7 +43,7 @@ class Participant(Base):
     enrollments = relationship("Enrollment", back_populates="participant")
     ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant") # <-- MAKE SURE THIS IS HERE
     l2l_progress = relationship("L2LProgress", back_populates="participant")
-    
+
 class Course(Base): # NEW
     __tablename__ = "courses"
     id = Column(Integer, primary_key=True, index=True)
@@ -148,7 +148,7 @@ class AIFluencyProgress(Base):
     
     participant = relationship("Participant", back_populates="ai_fluency_progress")
 
-    class L2LProgress(Base):
+class L2LProgress(Base):
     __tablename__ = "l2l_progress"
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
