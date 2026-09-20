@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="flex justify-between items-center mb-6 border-b pb-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">{{ module.icon }} {{ module.title }} — Interactive Game</h1>
+            <p class="text-gray-600 mt-1">Apply what you learned through hands-on practice</p>
+        </div>
+        <a href="/l2l/module/{{ module.code }}" class="text-orange-600 hover:underline font-semibold">← Back to Lesson</a>
+    </div>
+
+    <div id="game-container" class="bg-white rounded-xl shadow-lg p-8">
+        <!-- Games are injected here by JavaScript -->
+    </div>
+</div>
+
+<script>
+const MODULE_CODE = "{{ module.code }}";
+const PID = localStorage.getItem('nys_participant_id')?.trim().toUpperCase();
+
+// =====================================================================
+// MODULE 1: SYNAPTIC PINBALL
+// =====================================================================
+function loadModule1() {
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-indigo-700">🎯 Synaptic Pinball: Focused vs. Diffuse Mode</h2>
+            <p class="text-gray-600 mt-2">Experience how your brain solves problems in two different modes</p>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border-2 border-blue-300">
+                <h3 class="text-xl font-bold text-blue-800 mb-3">🎯 Focused Mode</h3>
+                <p class="text-sm text-gray-700 mb-4">Tight neural bumpers. Great for familiar problems.</p>
+                <div class="space-y-3">
+                    <button onclick="pinballAttempt(3)" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">Try Easy Problem (Difficulty 3)</button>
+                    <button onclick="pinballAttempt(8)" class="w-full bg-blue-800 text-white py-2 px-4 rounded-lg hover:bg-blue-900 transition">Try Hard Problem (Difficulty 8)</button>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border-2 border-purple-300">
+                <h3 class="text-xl font-bold text-purple-800 mb-3">🌊 Diffuse Mode</h3>
+                <p class="text-sm text-gray-700 mb-4">Wide neural connections. Activated during rest.</p>
+                <button onclick="pinballToggle()" id="mode-toggle" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition">Switch to Diffuse Mode</button>
+            </div>
+        </div>
+        <div class="mt-6 grid grid-cols-3 gap-4">
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                <p class="text-xs text-gray-500">Current Mode</p>
+                <p id="pin-mode" class="text-2xl font-bold text-blue-700">Focused</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                <p class="text-xs text-gray-500">Synaptic Strength</p>
+                <p id="pin-strength" class="text-2xl font-bold text-green-700">10</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                <p class="text-xs text-gray-500">Dendritic Spines</p>
+                <p id="pin-spines" class="text-2xl font-bold text-purple-700">0</p>
+            </div>
+        </div>
+        <div id="pin-message" class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded text-gray-800">
+            <strong>🎮 Ready!</strong> Try solving problems in Focused Mode, then switch to Diffuse when stuck.
+        </div>
+    `;
+}
+
+let pinState = { mode: "Focused", strength: 10, spines: 0, stuck: 0 };
+function pinballAttempt(difficulty) {
+    if (pinState.mode === "Focused") {
+        if (difficulty <= 5) {
+            pinState.strength += 2;
+            pinState.stuck = 0;
+            showPinMessage("SUCCESS", "🎯 Direct hit! Tight bumpers solved the familiar problem.", "green");
+        } else {
+            pinState.stuck++;
+            if (pinState.stuck >= 2) {
+                showPinMessage("STUCK", "🚫 Ball stuck! Your tight bumpers can't reach this. Switch to Diffuse Mode!", "red");
+            } else {
+                showPinMessage("RETRY", "🔄 Bounced off tight bumpers. Try again or switch modes.", "yellow");
+            }
+        }
+    } else {
+        pinState.stuck = 0;
+        pinState.strength += 5;
+        pinState.spines++;
+        showPinMessage("INSIGHT", "💡 Creative insight! Dendritic spines are sprouting during rest!", "purple");
+    }
+    document.getElementById('pin-strength').textContent = pinState.strength;
+    document.getElementById('pin-spines').textContent = pinState.spines;
+}
+function pinballToggle() {
+    pinState.mode = pinState.mode === "Focused" ? "Diffuse" : "Focused";
+    document.getElementById('pin-mode').textContent = pinState.mode;
+    document.getElementById('mode-toggle').textContent = `Switch to ${pinState.mode === 'Focused' ? 'Diffuse' : 'Focused'} Mode`;
+}
+function showPinMessage(type, msg, color) {
+    const colors = { green: 'bg-green-50 border-green-400', red: 'bg-red-50 border-red-400', yellow: 'bg-yellow-50 border-yellow-400', purple: 'bg-purple-50 border-purple-400' };
+    document.getElementById('pin-message').className = `mt-6 p-4 ${colors[color]} border-l-4 rounded text-gray-800`;
+    document.getElementById('pin-message').innerHTML = `<strong>${type}:</strong> ${msg}`;
+}
+
+// =====================================================================
+// MODULE 2: LEARNER AUDIT
+// =====================================================================
+function loadModule2() {
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-emerald-700">🪞 Multi-Factor Learner Diagnostic</h2>
+            <p class="text-gray-600 mt-2">Rate each statement 1 (Strongly Disagree) to 5 (Strongly Agree)</p>
+        </div>
+        <form id="audit-form" class="space-y-6">
+            <div class="bg-blue-50 p-5 rounded-lg">
+                <h3 class="font-bold text-blue-800 mb-3">📚 Learning Habits</h3>
+                <label class="block mb-2"><input type="radio" name="h1" value="1" required> I mostly highlight and reread notes</label>
+                <label class="block mb-2"><input type="radio" name="h1" value="2"> I summarize key ideas in my own words</label>
+                <label class="block"><input type="radio" name="h1" value="3"> I connect concepts to real-world examples and ask "Why?"</label>
+            </div>
+            <div class="bg-green-50 p-5 rounded-lg">
+                <h3 class="font-bold text-green-800 mb-3">🎯 Locus of Control (Internal)</h3>
+                <label class="block mb-2"><input type="radio" name="l1" value="1" required> My grades depend mainly on my effort</label>
+                <label class="block mb-2"><input type="radio" name="l1" value="2"> I choose study strategies that work for me</label>
+                <label class="block"><input type="radio" name="l1" value="3"> When I fail, I analyze what I can change</label>
+            </div>
+            <div class="bg-red-50 p-5 rounded-lg">
+                <h3 class="font-bold text-red-800 mb-3">🎲 Locus of Control (External)</h3>
+                <label class="block mb-2"><input type="radio" name="l2" value="1" required> Bad grades are usually the teacher's fault</label>
+                <label class="block mb-2"><input type="radio" name="l2" value="2"> I'm just not naturally smart at some subjects</label>
+                <label class="block"><input type="radio" name="l2" value="3"> Luck determines who succeeds</label>
+            </div>
+            <div class="bg-purple-50 p-5 rounded-lg">
+                <h3 class="font-bold text-purple-800 mb-3">🏠 Study Environment</h3>
+                <label class="block mb-2"><input type="radio" name="e1" value="1" required> I have a quiet dedicated study space</label>
+                <label class="block mb-2"><input type="radio" name="e1" value="2"> My family supports my study schedule</label>
+                <label class="block"><input type="radio" name="e1" value="3"> I control phone/social media distractions</label>
+            </div>
+            <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-emerald-700 transition">Generate My Learner Profile</button>
+        </form>
+        <div id="audit-result" class="hidden mt-6"></div>
+    `;
+    document.getElementById('audit-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const habits = parseInt(fd.get('h1')) + parseInt(fd.get('h1') || 0);
+        const result = await fetch('/api/l2l/game/audit', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                participant_id: PID,
+                habits_score: parseInt(fd.get('h1')) * 3,
+                locus_internal: parseInt(fd.get('l1')) * 3,
+                locus_external: parseInt(fd.get('l2')) * 3,
+                environment_score: parseInt(fd.get('e1')) * 3
+            })
+        }).then(r => r.json());
+        document.getElementById('audit-result').classList.remove('hidden');
+        document.getElementById('audit-result').innerHTML = `
+            <div class="bg-gradient-to-br from-emerald-50 to-green-50 p-6 rounded-xl border-2 border-emerald-300">
+                <h3 class="text-2xl font-bold text-emerald-800 mb-4">🎯 Your Learner Profile</h3>
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white p-4 rounded-lg"><p class="text-xs text-gray-500">Orientation</p><p class="text-xl font-bold text-blue-700">${result.orientation}</p><p class="text-sm mt-1">${result.habit_tip}</p></div>
+                    <div class="bg-white p-4 rounded-lg"><p class="text-xs text-gray-500">Locus of Control</p><p class="text-xl font-bold text-purple-700">${result.locus}</p><p class="text-sm mt-1">${result.locus_tip}</p></div>
+                </div>
+                <div class="bg-white p-4 rounded-lg text-center"><p class="text-xs text-gray-500">Overall Rating</p><p class="text-3xl font-bold">${result.overall}</p></div>
+            </div>
+        `;
+    };
+}
+
+// =====================================================================
+// MODULE 3: FLUENCY ILLUSION SIMULATOR
+// =====================================================================
+function loadModule3() {
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-amber-700">🎭 The Fluency Illusion Trap</h2>
+            <p class="text-gray-600 mt-2">See how passive rereading creates false confidence vs. active recall</p>
+        </div>
+        <div class="mb-6">
+            <label class="block font-bold mb-2">Simulate days after studying:</label>
+            <input type="range" id="days-slider" min="1" max="30" value="7" class="w-full" oninput="runFluencySim()">
+            <p class="text-center text-lg font-bold text-amber-700">Day <span id="days-display">7</span></p>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-red-50 p-6 rounded-xl border-2 border-red-300">
+                <h3 class="text-xl font-bold text-red-800 mb-3">📖 Passive Rereading</h3>
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600">Actual Retention</p>
+                    <div class="w-full bg-gray-200 rounded-full h-6 mt-1"><div id="reread-retain" class="bg-red-500 h-6 rounded-full transition-all" style="width: 30%"></div></div>
+                    <p id="reread-retain-num" class="text-right text-sm font-bold text-red-700">30%</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">Perceived Confidence (ILLUSION!)</p>
+                    <div class="w-full bg-gray-200 rounded-full h-6 mt-1"><div class="bg-red-300 h-6 rounded-full" style="width: 85%"></div></div>
+                    <p class="text-right text-sm font-bold text-red-500">85%</p>
+                </div>
+                <p class="mt-3 text-sm text-red-700 italic">⚠️ Huge gap = Fluency Illusion</p>
+            </div>
+            <div class="bg-green-50 p-6 rounded-xl border-2 border-green-300">
+                <h3 class="text-xl font-bold text-green-800 mb-3">🧠 Active Recall</h3>
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600">Actual Retention</p>
+                    <div class="w-full bg-gray-200 rounded-full h-6 mt-1"><div id="active-retain" class="bg-green-500 h-6 rounded-full transition-all" style="width: 33%"></div></div>
+                    <p id="active-retain-num" class="text-right text-sm font-bold text-green-700">33%</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">Perceived Confidence (HONEST)</p>
+                    <div class="w-full bg-gray-200 rounded-full h-6 mt-1"><div class="bg-green-300 h-6 rounded-full" style="width: 65%"></div></div>
+                    <p class="text-right text-sm font-bold text-green-500">65%</p>
+                </div>
+                <p class="mt-3 text-sm text-green-700 italic">✅ Small gap = True mastery</p>
+            </div>
+        </div>
+        <div id="fluency-insight" class="mt-6 p-4 bg-amber-50 border-l-4 border-amber-400 rounded"></div>
+    `;
+    runFluencySim();
+}
+async function runFluencySim() {
+    const days = document.getElementById('days-slider').value;
+    document.getElementById('days-display').textContent = days;
+    const result = await fetch('/api/l2l/game/fluency', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ days: parseInt(days) })
+    }).then(r => r.json());
+    document.getElementById('reread-retain').style.width = result.rereading.retention + '%';
+    document.getElementById('reread-retain-num').textContent = result.rereading.retention + '%';
+    document.getElementById('active-retain').style.width = result.active_recall.retention + '%';
+    document.getElementById('active-retain-num').textContent = result.active_recall.retention + '%';
+    document.getElementById('fluency-insight').innerHTML = `<strong>💡 Insight:</strong> ${result.insight}`;
+}
+
+// =====================================================================
+// MODULE 4: 60/30/10 PLANNER + EISENHOWER
+// =====================================================================
+function loadModule4() {
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-cyan-700">📅 Learning Plan Generator</h2>
+            <p class="text-gray-600 mt-2">Apply the 60/30/10 rule and Eisenhower Matrix</p>
+        </div>
+        <div class="bg-cyan-50 p-6 rounded-xl mb-6">
+            <h3 class="font-bold text-cyan-800 mb-3">🎯 60/30/10 EFT Planner</h3>
+            <label class="block mb-2">Weekly study hours:</label>
+            <input type="number" id="plan-hours" value="20" min="1" max="80" class="w-full p-2 border rounded mb-2">
+            <label class="block mb-2">Exam date:</label>
+            <input type="date" id="plan-date" class="w-full p-2 border rounded mb-4">
+            <button onclick="generatePlan()" class="w-full bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700">Generate My Plan</button>
+            <div id="plan-result" class="mt-4"></div>
+        </div>
+        <div class="bg-yellow-50 p-6 rounded-xl">
+            <h3 class="font-bold text-yellow-800 mb-3">🗂️ Eisenhower Matrix Sorter</h3>
+            <p class="text-sm text-gray-600 mb-3">Add a task and classify it:</p>
+            <input type="text" id="task-name" placeholder="e.g., Math exam in 3 weeks" class="w-full p-2 border rounded mb-2">
+            <div class="flex gap-4 mb-3">
+                <label class="flex items-center gap-2"><input type="checkbox" id="task-urgent"> Urgent</label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="task-important"> Important</label>
+            </div>
+            <button onclick="classifyTask()" class="w-full bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700">Classify Task</button>
+            <div id="task-result" class="mt-4"></div>
+        </div>
+    `;
+}
+async function generatePlan() {
+    const result = await fetch('/api/l2l/game/plan', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            hours: parseFloat(document.getElementById('plan-hours').value),
+            exam_date: document.getElementById('plan-date').value,
+            modules: []
+        })
+    }).then(r => r.json());
+    document.getElementById('plan-result').innerHTML = `
+        <div class="grid grid-cols-3 gap-3 mt-4">
+            <div class="bg-blue-100 p-3 rounded text-center"><p class="text-xs">Exploration (60%)</p><p class="text-2xl font-bold text-blue-800">${result.allocation.exploration}h</p></div>
+            <div class="bg-green-100 p-3 rounded text-center"><p class="text-xs">Fixation (30%)</p><p class="text-2xl font-bold text-green-800">${result.allocation.fixation}h</p></div>
+            <div class="bg-purple-100 p-3 rounded text-center"><p class="text-xs">Testing (10%)</p><p class="text-2xl font-bold text-purple-800">${result.allocation.testing}h</p></div>
+        </div>
+        <p class="mt-3 text-sm text-gray-700"><strong>📅 Days until exam:</strong> ${result.days_until_exam}</p>
+        <p class="text-sm text-gray-700"><strong>💡 Tip:</strong> ${result.recommendation}</p>
+    `;
+}
+async function classifyTask() {
+    const result = await fetch('/api/l2l/game/eisenhower', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            urgent: document.getElementById('task-urgent').checked,
+            important: document.getElementById('task-important').checked
+        })
+    }).then(r => r.json());
+    const colors = { red: 'bg-red-100 border-red-500 text-red-800', green: 'bg-green-100 border-green-500 text-green-800', yellow: 'bg-yellow-100 border-yellow-500 text-yellow-800', gray: 'bg-gray-100 border-gray-500 text-gray-800' };
+    document.getElementById('task-result').innerHTML = `
+        <div class="p-4 rounded-lg border-2 ${colors[result.color]} mt-3">
+            <p class="font-bold text-lg">${result.quadrant}: ${result.label}</p>
+            <p class="text-sm mt-1"><strong>Task:</strong> ${document.getElementById('task-name').value || 'Unnamed'}</p>
+            <p class="text-sm mt-1"><strong>Action:</strong> ${result.action}</p>
+        </div>
+    `;
+}
+
+// =====================================================================
+// MODULE 5: PROCRASTINATION ENGINE + POMODORO
+// =====================================================================
+function loadModule5() {
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-rose-700">⏱️ Beat Procrastination Lab</h2>
+            <p class="text-gray-600 mt-2">Diagnose your trigger and start a Pomodoro session</p>
+        </div>
+        <div class="bg-rose-50 p-6 rounded-xl mb-6">
+            <h3 class="font-bold text-rose-800 mb-3">🔍 Why are you avoiding this task?</h3>
+            <div class="space-y-2">
+                <button onclick="diagnoseTrigger('overwhelm')" class="w-full text-left p-3 bg-white rounded-lg hover:bg-rose-100 border border-rose-200">🏔️ "The task feels way too massive"</button>
+                <button onclick="diagnoseTrigger('perfectionism')" class="w-full text-left p-3 bg-white rounded-lg hover:bg-rose-100 border border-rose-200">📝 "I'm terrified my work won't be good enough"</button>
+                <button onclick="diagnoseTrigger('distraction')" class="w-full text-left p-3 bg-white rounded-lg hover:bg-rose-100 border border-rose-200">📱 "I keep getting pulled into phone apps"</button>
+                <button onclick="diagnoseTrigger('fear')" class="w-full text-left p-3 bg-white rounded-lg hover:bg-rose-100 border border-rose-200">⏱️ "I feel physical discomfort thinking about it"</button>
+            </div>
+            <div id="diag-result" class="mt-4"></div>
+        </div>
+        <div class="bg-gray-900 text-white p-8 rounded-xl text-center">
+            <h3 class="font-bold text-2xl mb-4">🍅 Pomodoro Timer</h3>
+            <p id="pomodoro-time" class="text-7xl font-mono font-bold mb-6">25:00</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="startPomodoro()" id="pom-start" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-bold">Start Focus</button>
+                <button onclick="pausePomodoro()" class="bg-yellow-600 hover:bg-yellow-700 px-6 py-2 rounded-lg font-bold">Pause</button>
+                <button onclick="resetPomodoro()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-bold">Reset</button>
+            </div>
+            <p id="pom-status" class="mt-4 text-gray-400">Focus strictly on the 25-minute window, not the task completion.</p>
+        </div>
+    `;
+}
+async function diagnoseTrigger(trigger) {
+    const result = await fetch('/api/l2l/game/procrastination', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ trigger })
+    }).then(r => r.json());
+    document.getElementById('diag-result').innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-rose-300 mt-3">
+            <p class="text-2xl mb-2">${result.icon}</p>
+            <p class="font-bold text-rose-800">Cause: ${result.cause}</p>
+            <p class="font-bold text-green-700 mt-2">Prescription: ${result.action}</p>
+            <p class="text-sm text-gray-700 mt-2 italic">${result.instruction}</p>
+        </div>
+    `;
+}
+let pomInterval = null, pomSeconds = 25 * 60;
+function startPomodoro() {
+    if (pomInterval) return;
+    document.getElementById('pom-status').textContent = '🎯 FOCUS MODE — Turn off all notifications!';
+    pomInterval = setInterval(() => {
+        pomSeconds--;
+        const m = Math.floor(pomSeconds / 60), s = pomSeconds % 60;
+        document.getElementById('pomodoro-time').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        if (pomSeconds <= 0) {
+            clearInterval(pomInterval); pomInterval = null;
+            document.getElementById('pom-status').textContent = '🎉 25 minutes complete! Take a 5-minute reward break.';
+            alert('🍅 Pomodoro complete! Take a 5-minute break.');
+        }
+    }, 1000);
+}
+function pausePomodoro() { clearInterval(pomInterval); pomInterval = null; document.getElementById('pom-status').textContent = '⏸️ Paused. Click Start to resume.'; }
+function resetPomodoro() { clearInterval(pomInterval); pomInterval = null; pomSeconds = 25 * 60; document.getElementById('pomodoro-time').textContent = '25:00'; document.getElementById('pom-status').textContent = 'Focus strictly on the 25-minute window, not the task completion.'; }
+
+// =====================================================================
+// MODULE 6: LEITNER FLASHCARDS
+// =====================================================================
+function loadModule6() {
+    const sampleCards = [
+        {q: "What is BDNF?", a: "Brain-Derived Neurotrophic Factor — 'brain fertilizer' released during exercise"},
+        {q: "What is the 'Power of YET'?", a: "Reframing 'I can't' to 'I can't YET' — growth mindset"},
+        {q: "How many slots in working memory?", a: "Approximately 4 slots (tentacles of attention)"},
+        {q: "What is the Pomodoro duration?", a: "25 minutes focus + 5 minutes break"},
+        {q: "What does STAR stand for?", a: "Stop, Think, Act, Review"}
+    ];
+    window.leitnerCards = sampleCards.map((c, i) => ({...c, id: i, box: 1}));
+    renderLeitner();
+}
+function renderLeitner() {
+    const currentBox = Math.min(...window.leitnerCards.map(c => c.box));
+    const cardsToReview = window.leitnerCards.filter(c => c.box === currentBox);
+    const boxCounts = [1,2,3,4,5].map(b => window.leitnerCards.filter(c => c.box === b).length);
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-violet-700">🗃️ Leitner 5-Box Flashcard Engine</h2>
+            <p class="text-gray-600 mt-2">Spaced repetition: correct answers promote, wrong answers demote to Box 1</p>
+        </div>
+        <div class="grid grid-cols-5 gap-2 mb-6">
+            ${boxCounts.map((c, i) => `<div class="bg-violet-50 p-3 rounded text-center border-2 ${i+1 === currentBox ? 'border-violet-600' : 'border-violet-200'}"><p class="text-xs">Box ${i+1}</p><p class="text-xl font-bold">${c}</p><p class="text-xs text-gray-500">${[1,3,7,14,30][i]}d</p></div>`).join('')}
+        </div>
+        ${cardsToReview.length === 0 ? '<p class="text-center text-green-600 font-bold text-xl">🎉 All cards reviewed! Come back tomorrow.</p>' : `
+            <div class="bg-white p-8 rounded-xl shadow-lg border-2 border-violet-300 text-center">
+                <p class="text-sm text-gray-500 mb-2">Box ${currentBox} • Card ${window.leitnerCards.filter(c=>c.box===currentBox).length} remaining</p>
+                <p class="text-2xl font-bold text-gray-900 mb-6">${cardsToReview[0].q}</p>
+                <button onclick="flipCard(${cardsToReview[0].id})" class="bg-violet-600 text-white px-6 py-2 rounded-lg hover:bg-violet-700 mb-4">Reveal Answer</button>
+                <div id="card-answer" class="hidden mt-4 p-4 bg-violet-50 rounded-lg">
+                    <p class="text-lg text-gray-800 mb-4">${cardsToReview[0].a}</p>
+                    <div class="flex gap-3 justify-center">
+                        <button onclick="gradeCard(${cardsToReview[0].id}, true)" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">✅ Correct</button>
+                        <button onclick="gradeCard(${cardsToReview[0].id}, false)" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">❌ Incorrect</button>
+                    </div>
+                </div>
+                <div id="card-feedback" class="mt-4"></div>
+            </div>
+        `}
+    `;
+}
+function flipCard(id) { document.getElementById('card-answer').classList.remove('hidden'); }
+async function gradeCard(id, correct) {
+    const card = window.leitnerCards.find(c => c.id === id);
+    const result = await fetch('/api/l2l/game/leitner', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ box: card.box, correct })
+    }).then(r => r.json());
+    card.box = result.new_box;
+    document.getElementById('card-feedback').innerHTML = `<p class="p-3 ${correct ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} rounded">${result.message}</p>`;
+    setTimeout(renderLeitner, 1500);
+}
+
+// =====================================================================
+// MODULE 7: PDSA EXAM STRATEGY
+// =====================================================================
+function loadModule7() {
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-teal-700">📝 PDSA Exam Strategy Generator</h2>
+            <p class="text-gray-600 mt-2">Plan-Do-Study-Act cycle for continuous exam improvement</p>
+        </div>
+        <div class="bg-teal-50 p-6 rounded-xl">
+            <label class="block mb-2 font-bold">Subject:</label>
+            <input type="text" id="exam-subject" value="Mathematics" class="w-full p-2 border rounded mb-3">
+            <label class="block mb-2 font-bold">Days until exam:</label>
+            <input type="number" id="exam-days" value="30" min="1" class="w-full p-2 border rounded mb-3">
+            <label class="block mb-2 font-bold">Confidence (1-5):</label>
+            <input type="range" id="exam-conf" min="1" max="5" value="3" class="w-full mb-3" oninput="document.getElementById('conf-val').textContent=this.value">
+            <p class="text-center mb-4">Level: <span id="conf-val" class="font-bold text-teal-700">3</span></p>
+            <button onclick="generateStrategy()" class="w-full bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Generate PDSA Strategy</button>
+            <div id="strategy-result" class="mt-4"></div>
+        </div>
+    `;
+}
+async function generateStrategy() {
+    const result = await fetch('/api/l2l/game/exam-strategy', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            subject: document.getElementById('exam-subject').value,
+            days: parseInt(document.getElementById('exam-days').value),
+            confidence: parseInt(document.getElementById('exam-conf').value)
+        })
+    }).then(r => r.json());
+    document.getElementById('strategy-result').innerHTML = `
+        <div class="space-y-3 mt-4">
+            <div class="bg-blue-100 p-4 rounded-lg"><p class="font-bold text-blue-800">📋 PLAN</p><p class="text-sm">${result.plan}</p></div>
+            <div class="bg-green-100 p-4 rounded-lg"><p class="font-bold text-green-800">🎯 DO</p><p class="text-sm">${result.do}</p></div>
+            <div class="bg-yellow-100 p-4 rounded-lg"><p class="font-bold text-yellow-800">🔍 STUDY</p><p class="text-sm">${result.study}</p></div>
+            <div class="bg-purple-100 p-4 rounded-lg"><p class="font-bold text-purple-800">⚡ ACT</p><p class="text-sm">${result.act}</p></div>
+        </div>
+    `;
+}
+
+// =====================================================================
+// MODULE 8: FEYNMAN TEACH-BACK
+// =====================================================================
+function loadModule8() {
+    document.getElementById('game-container').innerHTML = `
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-fuchsia-700">🎓 The Feynman Teach-Back Challenge</h2>
+            <p class="text-gray-600 mt-2">Explain a concept as if to a 10-year-old. No jargon allowed!</p>
+        </div>
+        <div class="bg-fuchsia-50 p-6 rounded-xl mb-6">
+            <h3 class="font-bold text-fuchsia-800 mb-3">Choose a topic:</h3>
+            <select id="feynman-topic" class="w-full p-2 border rounded mb-3">
+                <option value="photosynthesis">🌱 Photosynthesis (Grade 9 Science)</option>
+                <option value="growth mindset">🧠 Growth Mindset</option>
+                <option value="active recall">📚 Active Recall</option>
+            </select>
+            <label class="block font-bold mb-2">Explain it to a 10-year-old:</label>
+            <textarea id="feynman-text" rows="6" placeholder="Imagine you're explaining this to a child who has never heard of it. Use simple words and everyday analogies (like cooking, sports, or games)..." class="w-full p-3 border rounded mb-3"></textarea>
+            <button onclick="evaluateFeynman()" class="w-full bg-fuchsia-600 text-white py-2 rounded-lg hover:bg-fuchsia-700">Evaluate My Explanation</button>
+            <div id="feynman-result" class="mt-4"></div>
+        </div>
+    `;
+}
+async function evaluateFeynman() {
+    const result = await fetch('/api/l2l/game/feynman', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            topic: document.getElementById('feynman-topic').value,
+            text: document.getElementById('feynman-text').value
+        })
+    }).then(r => r.json());
+    const colors = { MASTERY: 'bg-green-100 border-green-500 text-green-800', DEVELOPING: 'bg-yellow-100 border-yellow-500 text-yellow-800', SURFACE: 'bg-red-100 border-red-500 text-red-800' };
+    document.getElementById('feynman-result').innerHTML = `
+        <div class="p-6 rounded-xl border-2 ${colors[result.level]}">
+            <p class="text-2xl font-bold mb-2">${result.level}</p>
+            <p class="mb-3">${result.feedback}</p>
+            <div class="grid grid-cols-3 gap-3 text-sm">
+                <div class="bg-white p-2 rounded"><p class="text-xs">Coverage</p><p class="font-bold">${result.coverage}%</p></div>
+                <div class="bg-white p-2 rounded"><p class="text-xs">Words Used</p><p class="font-bold">${result.word_count}</p></div>
+                <div class="bg-white p-2 rounded"><p class="text-xs">Jargon Ratio</p><p class="font-bold">${result.jargon_ratio}%</p></div>
+            </div>
+            ${result.missing_concepts.length > 0 ? `<p class="mt-3 text-sm"><strong>Missing concepts:</strong> ${result.missing_concepts.join(', ')}</p>` : ''}
+        </div>
+    `;
+}
+
+// =====================================================================
+// ROUTER — Load correct game based on module
+// =====================================================================
+const gameLoaders = {
+    "L2L-M1": loadModule1, "L2L-M2": loadModule2, "L2L-M3": loadModule3,
+    "L2L-M4": loadModule4, "L2L-M5": loadModule5, "L2L-M6": loadModule6,
+    "L2L-M7": loadModule7, "L2L-M8": loadModule8
+};
+(gameLoaders[MODULE_CODE] || loadModule1)();
+</script>
+{% endblock %}

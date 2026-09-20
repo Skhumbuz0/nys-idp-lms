@@ -10,6 +10,28 @@
     <div class="prose max-w-none text-gray-800 mb-10 leading-relaxed">
         {{ module.content_html | safe }}
     </div>
+    
+    <!-- INTERACTIVE GAME SECTION -->
+    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl border-2 border-indigo-200 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h2 class="text-2xl font-bold text-indigo-800">🎮 Interactive Game / Diagnostic</h2>
+                <p class="text-sm text-gray-600 mt-1">Apply what you learned through hands-on practice</p>
+            </div>
+            <a href="/l2l/game/{{ module.code }}" class="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition shadow-lg whitespace-nowrap">
+                Launch Game →
+            </a>
+        </div>
+        <div class="bg-white p-4 rounded-lg">
+            <p class="text-sm text-gray-700"><strong>What you'll do:</strong></p>
+            <ul class="text-sm text-gray-600 mt-2 list-disc pl-5">
+                <li>Experience the concept through an interactive simulation</li>
+                <li>Get instant personalized feedback</li>
+                <li>Apply the theory to your own learning context</li>
+            </ul>
+        </div>
+    </div>
+
 
     <!-- Quiz Section -->
     <div class="bg-orange-50 p-6 rounded-xl border-2 border-orange-200">
