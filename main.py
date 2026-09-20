@@ -26,7 +26,7 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", "MAYO LMS <onboarding@resend.dev>")
 # EMAIL UTILITIES
 # ==========================================
 def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an email using a Gmail App Password. Free and requires no domain."""
+    """Send an email using a Gmail App Password via STARTTLS (Port 587)."""
     gmail_user = os.getenv("GMAIL_USER", "masango.pleasure@gmail.com")
     gmail_password = os.getenv("GMAIL_APP_PASSWORD", "")
     
@@ -42,8 +42,9 @@ def send_email(to_email: str, subject: str, html_content: str) -> bool:
         msg.set_content("Please view this email in an HTML-compatible email client.")
         msg.add_alternative(html_content, subtype='html')
         
-        # Connect to Gmail's SMTP server
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        # Connect to Gmail's SMTP server using STARTTLS (Port 587)
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls() # Secure the connection
             server.login(gmail_user, gmail_password)
             server.send_message(msg)
             
