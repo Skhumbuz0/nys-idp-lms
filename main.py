@@ -741,6 +741,7 @@ def l2l_module_overview(request: Request, module_code: str, db = Depends(get_db)
 
 # NEW: Individual Sub-Module Page
 @app.get("/l2l/module/{module_code}/sub/{sub_index}", response_class=HTMLResponse)
+@app.get("/l2l/module/{module_code}/sub/{sub_index}", response_class=HTMLResponse)
 def l2l_submodule_view(request: Request, module_code: str, sub_index: int):
     module = next((m for m in L2L_MODULES if m["code"] == module_code), None)
     if not module:
@@ -751,13 +752,17 @@ def l2l_submodule_view(request: Request, module_code: str, sub_index: int):
     submodule = module["submodules"][sub_index]
     total_subs = len(module["submodules"])
     
+    # Calculate progress percentage as a clean integer
+    progress_percent = int(((sub_index + 1) / total_subs) * 100)
+    
     return templates.TemplateResponse(request=request, name="l2l_submodule.html", context={
         "module": module,
         "submodule": submodule,
         "sub_index": sub_index,
         "total_subs": total_subs,
         "has_prev": sub_index > 0,
-        "has_next": sub_index < total_subs - 1
+        "has_next": sub_index < total_subs - 1,
+        "progress_percent": progress_percent
     })
 
 # NEW: Separate Quiz Page
