@@ -48,9 +48,31 @@
                 }
 
                 courses.forEach(course => {
-                    let colorClass = course.code === 'NYS-IDP' ? 'border-purple-500' : 'border-green-500';
-                    let btnColor = course.code === 'NYS-IDP' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700';
-                    let route = course.code === 'NYS-IDP' ? '/my-progress' : '/nemisa';
+                    // Define colors and routes for each course
+                    let colorClass, btnColor, barColor, route;
+                    
+                    if (course.code === 'NYS-IDP') {
+                        colorClass = 'border-purple-500';
+                        btnColor = 'bg-purple-600 hover:bg-purple-700';
+                        barColor = 'bg-purple-600';
+                        route = '/my-progress';
+                    } else if (course.code === 'NEMISA-DIGITAL') {
+                        colorClass = 'border-green-500';
+                        btnColor = 'bg-green-600 hover:bg-green-700';
+                        barColor = 'bg-green-600';
+                        route = '/nemisa';
+                    } else if (course.code === 'MAYO-AI') {
+                        colorClass = 'border-indigo-500';
+                        btnColor = 'bg-indigo-600 hover:bg-indigo-700';
+                        barColor = 'bg-indigo-600';
+                        route = '/ai-fluency';
+                    } else {
+                        // Fallback for any future courses
+                        colorClass = 'border-gray-500';
+                        btnColor = 'bg-gray-600 hover:bg-gray-700';
+                        barColor = 'bg-gray-600';
+                        route = '/learner-dashboard';
+                    }
                     
                     const card = `
                         <div class="bg-white rounded-xl shadow-md border-t-4 ${colorClass} p-6 flex flex-col justify-between">
@@ -63,7 +85,7 @@
                                         <span>${course.progress}%</span>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-3">
-                                        <div class="${course.code === 'NYS-IDP' ? 'bg-purple-600' : 'bg-green-600'} h-3 rounded-full transition-all duration-500" style="width: ${course.progress}%"></div>
+                                        <div class="${barColor} h-3 rounded-full transition-all duration-500" style="width: ${course.progress}%"></div>
                                     </div>
                                 </div>
                             </div>
