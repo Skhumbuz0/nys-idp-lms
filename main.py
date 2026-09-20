@@ -1082,4 +1082,44 @@ def fix_db_schema(db = Depends(get_db)):
              return {"message": "Column already exists. Database is fine!"}
         return {"error": str(e)}
 
+@app.get("/enroll-all-ai")
+def enroll_all_ai(db = Depends(get_db)):
+    """Guarantees MAYO-AI course exists and enrolls all participants."""
     
+    # 1. Ensure the MAYO-AI Course exists
+    ai_course = db.query(Course).filter(Course.code == "MAYO-AI").first()
+    if not ai_course:
+        db.add(Course(
+            code="MAYO-AI", 
+            title="MAYO AI Fluency Programme", 
+            description="Master responsible AI use, from core foundations to practical business, creative, or community applications."
+        ))
+        db.commit()
+        print("✅ MAYO-AI course created.")
+    
+    # 2. Enroll every participant who doesn't already have it
+    participants = db.query(Participant).all()
+    enrolled_count = 0
+    
+    for p in participants:
+        existing = db.query(Enrollment).filter(
+            Enrollment.participant_id == p.participant_id, 
+            Enrollment.course_code == "MAYO-AI"
+        ).count()
+        
+        if existing == 0:
+            db.add(Enrollment(
+                participant_id=p.participant_id, 
+                course_code="MAYO-AI", 
+                progress_pct=0.0,
+                status="Active"
+            ))
+            enrolled_count += 1
+    
+    db.commit()
+    
+    return {
+        "message": f"✅ MAYO-AI course confirmed. Enrolled {enrolled_count} new participants in AI Fluency Programme.",
+        "total_participants": len(participants),
+        "newly_enrolled": enrolled_count
+    }
