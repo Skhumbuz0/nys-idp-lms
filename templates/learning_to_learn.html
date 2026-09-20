@@ -42,54 +42,84 @@
     const rawPid = localStorage.getItem('nys_participant_id');
     const pid = rawPid ? rawPid.trim().toUpperCase() : null;
     
+    console.log("🔍 Starting L2L load with PID:", pid);
+    
     if (!pid) {
+        console.error("❌ No participant ID found in localStorage");
         window.location.href = '/login';
     } else {
-        console.log("🔍 Fetching L2L data for PID:", pid);
+        console.log("📡 Fetching from: /api/l2l/" + pid);
         
         fetch(`/api/l2l/${pid}`)
-            .then(async r => {
-                if (!r.ok) {
-                    const errorText = await r.text();
-                    throw new Error(`Server returned ${r.status}: ${errorText}`);
+            .then(response => {
+                console.log("📥 Response status:", response.status);
+                console.log("📥 Response OK:", response.ok);
+                
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error("❌ Server error response:", text);
+                        throw new Error(`HTTP ${response.status}: ${text}`);
+                    });
                 }
-                return r.json();
+                return response.json();
             })
             .then(data => {
-                console.log("✅ L2L Data received:", data);
+                console.log("✅ Data received successfully:", data);
+                console.log("📊 Modules count:", data.modules?.length);
+                
+                if (!data.modules || data.modules.length === 0) {
+                    throw new Error("No modules returned from server");
+                }
+                
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('modules-grid').classList.remove('hidden');
                 
-                document.getElementById('l2l-progress-bar').style.width = data.overall_pct + '%';
-                document.getElementById('l2l-progress-text').textContent = data.overall_pct;
+                document.getElementById('l2l-progress-bar').style.width = (data.overall_pct || 0) + '%';
+                document.getElementById('l2l-progress-text').textContent = data.overall_pct || 0;
 
                 const grid = document.getElementById('modules-grid');
-                data.modules.forEach(m => {
+                grid.innerHTML = ''; // Clear any existing content
+                
+                data.modules.forEach((m, index) => {
+                    console.log(`📦 Rendering module ${index + 1}:`, m.title);
+                    
                     const statusColor = m.completed ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white';
                     const badge = m.completed 
                         ? '<span class="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-bold">✅ Passed</span>' 
                         : '<span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">Pending</span>';
                     
-                    grid.innerHTML += `
+                    const card = `
                         <a href="/l2l/module/${m.code}" class="block p-6 rounded-xl shadow-md border-l-4 ${statusColor} hover:shadow-lg transition">
                             <div class="flex justify-between items-start mb-3">
-                                <span class="text-4xl">${m.icon}</span>
+                                <span class="text-4xl">${m.icon || '📘'}</span>
                                 ${badge}
                             </div>
                             <h3 class="font-bold text-gray-900 mb-2">${m.title}</h3>
-                            <p class="text-sm text-gray-600">Quiz Score: ${m.score}</p>
+                            <p class="text-sm text-gray-600">Quiz Score: ${m.score || '0/0'}</p>
                             <div class="mt-4 text-orange-600 font-semibold text-sm">Start Module →</div>
                         </a>
                     `;
+                    grid.innerHTML += card;
                 });
+                
+                console.log("✅ All modules rendered successfully");
             })
             .catch(err => {
-                console.error("❌ L2L Fetch Error:", err);
+                console.error("❌ FULL ERROR:", err);
+                console.error("❌ Error name:", err.name);
+                console.error("❌ Error message:", err.message);
+                console.error("❌ Error stack:", err.stack);
+                
                 document.getElementById('loading').innerHTML = `
                     <div class="text-red-600 text-center p-6 bg-red-50 rounded-lg border-2 border-red-200">
                         <p class="text-xl font-bold mb-2">❌ Error Loading Modules</p>
-                        <p class="text-sm mb-4 bg-white p-3 rounded border border-red-100">${err.message}</p>
-                        <p class="text-xs text-gray-600">Please open your browser Console (Press F12) and share the red error message.</p>
+                        <p class="text-sm mb-4 bg-white p-3 rounded border border-red-100 text-left">
+                            <strong>Error:</strong> ${err.message}<br>
+                            <strong>Check browser console (F12) for full details</strong>
+                        </p>
+                        <p class="text-xs text-gray-600 mt-2">
+                            Try visiting <a href="/api/l2l/${pid}" class="underline font-bold text-blue-600" target="_blank">/api/l2l/${pid}</a> directly to see the raw API response.
+                        </p>
                     </div>
                 `;
             });
