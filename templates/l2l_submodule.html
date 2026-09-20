@@ -16,7 +16,23 @@
         <div class="mt-2 flex items-center gap-2 text-sm text-gray-500">
             <span>📖 Sub-Module {{ sub_index + 1 }} of {{ total_subs }}</span>
             <div class="flex-1 bg-gray-200 rounded-full h-2 ml-4">
-                <div class="bg-orange-500 h-2 rounded-full" style="width: {{ ((sub_index + 1) / total_subs) * 100 }}%"></div>
+                <div class="bg-orange-500 h-2 rounded-full transition-all duration-500" style="width: {{ progress_percent }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Display -->
+    <div class="mb-6">
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <img src="/static/Image_{{ submodule.number }}.png" 
+                 alt="Illustration for Sub-Module {{ submodule.number }}"
+                 class="w-full h-auto max-h-[500px] object-contain bg-gray-50"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+            <div class="hidden w-full h-64 bg-gradient-to-br from-orange-100 to-orange-200 items-center justify-center text-gray-500">
+                <div class="text-center">
+                    <span class="text-6xl mb-2 block">📖</span>
+                    <p class="text-sm">Visual content for Sub-Module {{ submodule.number }}</p>
+                </div>
             </div>
         </div>
     </div>
