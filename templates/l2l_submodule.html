@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Breadcrumb & Header -->
+    <div class="mb-6">
+        <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
+            <a href="/learning-to-learn" class="hover:text-orange-600">Course</a>
+            <span>›</span>
+            <a href="/l2l/module/{{ module.code }}" class="hover:text-orange-600">{{ module.icon }} {{ module.title }}</a>
+            <span>›</span>
+            <span class="text-gray-900 font-semibold">Sub-Module {{ submodule.number }}</span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
+            <span class="text-orange-600">{{ submodule.number }}</span> {{ submodule.title }}
+        </h1>
+        <div class="mt-2 flex items-center gap-2 text-sm text-gray-500">
+            <span>📖 Sub-Module {{ sub_index + 1 }} of {{ total_subs }}</span>
+            <div class="flex-1 bg-gray-200 rounded-full h-2 ml-4">
+                <div class="bg-orange-500 h-2 rounded-full" style="width: {{ ((sub_index + 1) / total_subs) * 100 }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Card -->
+    <div class="bg-white rounded-xl shadow-lg p-6 md:p-10 mb-6">
+        <div class="prose max-w-none text-gray-800 leading-relaxed">
+            {{ submodule.content_html | safe }}
+        </div>
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="flex flex-col sm:flex-row justify-between gap-3 mb-6">
+        {% if has_prev %}
+        <a href="/l2l/module/{{ module.code }}/sub/{{ sub_index - 1 }}" 
+           class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition text-center">
+            ← Previous Sub-Module
+        </a>
+        {% else %}
+        <a href="/l2l/module/{{ module.code }}" 
+           class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition text-center">
+            ← Module Overview
+        </a>
+        {% endif %}
+
+        {% if has_next %}
+        <a href="/l2l/module/{{ module.code }}/sub/{{ sub_index + 1 }}" 
+           class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition text-center shadow">
+            Next Sub-Module →
+        </a>
+        {% else %}
+        <a href="/l2l/module/{{ module.code }}/quiz" 
+           class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition text-center shadow">
+            📝 Take the Quiz →
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Quick Links -->
+    <div class="bg-gray-50 p-4 rounded-lg text-center">
+        <p class="text-sm text-gray-600 mb-2">Need to review?</p>
+        <div class="flex flex-wrap justify-center gap-2">
+            <a href="/l2l/module/{{ module.code }}" class="text-orange-600 hover:underline text-sm">📋 Module Overview</a>
+            <span class="text-gray-400">•</span>
+            <a href="/l2l/module/{{ module.code }}/quiz" class="text-purple-600 hover:underline text-sm">📝 Quiz</a>
+            <span class="text-gray-400">•</span>
+            <a href="/l2l/game/{{ module.code }}" class="text-indigo-600 hover:underline text-sm">🎮 Game</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

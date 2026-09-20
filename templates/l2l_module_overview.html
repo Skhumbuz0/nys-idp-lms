@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="flex justify-between items-center mb-6 border-b pb-4">
+        <div>
+            <a href="/learning-to-learn" class="text-orange-600 hover:underline text-sm">← Back to Course</a>
+            <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ module.icon }} {{ module.title }}</h1>
+            <p class="text-gray-600 mt-1">Work through each sub-module, then take the quiz and play the game.</p>
+        </div>
+    </div>
+
+    <!-- Sub-Modules Grid -->
+    <div class="mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">📖 Sub-Modules ({{ module.submodules|length }} lessons)</h2>
+        <div class="grid md:grid-cols-2 gap-4">
+            {% for sub in module.submodules %}
+            <a href="/l2l/module/{{ module.code }}/sub/{{ loop.index0 }}" 
+               class="block bg-white p-5 rounded-xl shadow-md border-l-4 border-orange-400 hover:shadow-lg hover:border-orange-600 transition">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <span class="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded">Sub-Module {{ sub.number }}</span>
+                        <h3 class="font-bold text-gray-900 mt-2 mb-1">{{ sub.title }}</h3>
+                        <p class="text-sm text-gray-500">Click to start reading →</p>
+                    </div>
+                    <span class="text-2xl">{{ module.icon }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Assessment & Games Section -->
+    <div class="grid md:grid-cols-2 gap-6">
+        <a href="/l2l/module/{{ module.code }}/quiz" 
+           class="bg-gradient-to-br from-purple-500 to-purple-700 text-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition">
+            <h3 class="text-2xl font-bold mb-2">📝 Take the Quiz</h3>
+            <p class="text-purple-100 mb-4">Test your understanding with {{ module.quiz|length }} questions. Score 80%+ to pass.</p>
+            <span class="bg-white text-purple-700 font-bold py-2 px-4 rounded-lg inline-block">Start Quiz →</span>
+        </a>
+        
+        <a href="/l2l/game/{{ module.code }}" 
+           class="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition">
+            <h3 class="text-2xl font-bold mb-2">🎮 Play the Game</h3>
+            <p class="text-indigo-100 mb-4">Apply what you learned through an interactive simulation.</p>
+            <span class="bg-white text-indigo-700 font-bold py-2 px-4 rounded-lg inline-block">Launch Game →</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
