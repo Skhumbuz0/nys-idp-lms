@@ -21,7 +21,14 @@
         </div>
     </div>
 
-    <!-- Image Display -->
+    <!-- Content Card (NOW FIRST) -->
+    <div class="bg-white rounded-xl shadow-lg p-6 md:p-10 mb-6">
+        <div class="prose max-w-none text-gray-800 leading-relaxed">
+            {{ submodule.content_html | safe }}
+        </div>
+    </div>
+
+    <!-- Image Display (NOW BELOW CONTENT) -->
     <div class="mb-6">
         <div class="bg-white rounded-xl shadow-lg overflow-hidden">
             <img src="/static/Image_{{ submodule.number }}.png" 
@@ -34,13 +41,6 @@
                     <p class="text-sm">Visual content for Sub-Module {{ submodule.number }}</p>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Content Card -->
-    <div class="bg-white rounded-xl shadow-lg p-6 md:p-10 mb-6">
-        <div class="prose max-w-none text-gray-800 leading-relaxed">
-            {{ submodule.content_html | safe }}
         </div>
     </div>
 
