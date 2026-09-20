@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+    <div class="flex justify-between items-center mb-6 border-b pb-4">
+        <h1 class="text-3xl font-bold text-gray-900">{{ module.icon }} {{ module.title }}</h1>
+        <a href="/learning-to-learn" class="text-gray-500 hover:text-orange-600">← Back to Dashboard</a>
+    </div>
+
+    <!-- Reading Content -->
+    <div class="prose max-w-none text-gray-800 mb-10 leading-relaxed">
+        {{ module.content_html | safe }}
+    </div>
+
+    <!-- Quiz Section -->
+    <div class="bg-orange-50 p-6 rounded-xl border-2 border-orange-200">
+        <h2 class="text-2xl font-bold text-orange-800 mb-4">📝 Module Assessment</h2>
+        <p class="text-sm text-gray-600 mb-6">Score 80% or higher to complete this module and update your course progress.</p>
+        
+        <form method="POST" action="/l2l/quiz/{{ module.code }}" class="space-y-6">
+            <input type="hidden" name="participant_id" id="pid-input">
+            
+            {% for q in module.quiz %}
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                <p class="font-bold text-gray-900 mb-3">{{ loop.index }}. {{ q.q }}</p>
+                <div class="space-y-2">
+                    {% for opt in q.options %}
+                    <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded">
+                        <input type="radio" name="q_{{ loop.index0 }}" value="{{ loop.index0 }}" required class="text-orange-600 focus:ring-orange-500 h-4 w-4">
+                        <span class="text-gray-700">{{ opt }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            <button type="submit" class="w-full bg-orange-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-orange-700 transition shadow-lg">
+                Submit Quiz & Save Progress
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.getElementById('pid-input').value = localStorage.getItem('nys_participant_id').trim().toUpperCase();
+</script>
+{% endblock %}

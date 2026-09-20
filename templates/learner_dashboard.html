@@ -61,11 +61,19 @@
                         btnColor = 'bg-green-600 hover:bg-green-700';
                         barColor = 'bg-green-600';
                         route = '/nemisa';
+
                     } else if (course.code === 'MAYO-AI') {
                         colorClass = 'border-indigo-500';
                         btnColor = 'bg-indigo-600 hover:bg-indigo-700';
                         barColor = 'bg-indigo-600';
                         route = '/ai-fluency';
+                    
+                    } else if (course.code === 'MAYO-L2L') {
+                        colorClass = 'border-orange-500';
+                        btnColor = 'bg-orange-600 hover:bg-orange-700';
+                        barColor = 'bg-orange-600';
+                        route = '/learning-to-learn';    
+                    
                     } else {
                         // Fallback for any future courses
                         colorClass = 'border-gray-500';
@@ -73,6 +81,8 @@
                         barColor = 'bg-gray-600';
                         route = '/learner-dashboard';
                     }
+
+                    
                     
                     const card = `
                         <div class="bg-white rounded-xl shadow-md border-t-4 ${colorClass} p-6 flex flex-col justify-between">

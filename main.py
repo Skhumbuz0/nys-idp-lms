@@ -2,6 +2,7 @@
 import re
 import json
 import os
+from l2l_data import L2L_MODULES
 from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
@@ -10,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from database import Base, engine, get_db
-from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport, Course, Enrollment, AIFluencyProgress
+from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport, Course, Enrollment, AIFluencyProgress,L2LProgress
 import smtplib
 from email.message import EmailMessage
 
@@ -689,6 +690,77 @@ async def submit_ai_evidence(request: Request, db = Depends(get_db)):
     return RedirectResponse(url="/ai-fluency", status_code=303)
 
 # ==========================================
+# LEARNING TO LEARN (L2L) ROUTES
+# ==========================================
+@app.get("/learning-to-learn", response_class=HTMLResponse)
+def l2l_dashboard(request: Request):
+    return templates.TemplateResponse(request=request, name="learning_to_learn.html", context={"modules": L2L_MODULES})
+
+@app.get("/api/l2l/{pid}")
+def get_l2l_data(pid: str, db = Depends(get_db)):
+    pid = pid.upper().strip()
+    progress_records = db.query(L2LProgress).filter(L2LProgress.participant_id == pid).all()
+    progress_map = {r.module_code: r for r in progress_records}
+    
+    modules_data = []
+    for m in L2L_MODULES:
+        record = progress_map.get(m["code"])
+        modules_data.append({
+            "code": m["code"],
+            "title": m["title"],
+            "icon": m["icon"],
+            "completed": record.completed if record else False,
+            "score": f"{record.quiz_score}/{record.quiz_max}" if record else "0/0"
+        })
+        
+    completed_count = sum(1 for m in modules_data if m["completed"])
+    overall_pct = int((completed_count / len(L2L_MODULES)) * 100)
+    
+    # Update enrollment progress
+    enrollment = db.query(Enrollment).filter(Enrollment.participant_id == pid, Enrollment.course_code == "MAYO-L2L").first()
+    if enrollment:
+        enrollment.progress_pct = float(overall_pct)
+        db.commit()
+        
+    return {"modules": modules_data, "overall_pct": overall_pct}
+
+@app.get("/l2l/module/{module_code}", response_class=HTMLResponse)
+def l2l_module_view(request: Request, module_code: str):
+    module = next((m for m in L2L_MODULES if m["code"] == module_code), None)
+    if not module: raise HTTPException(404, "Module not found")
+    return templates.TemplateResponse(request=request, name="l2l_module.html", context={"module": module})
+
+@app.post("/l2l/quiz/{module_code}")
+async def submit_l2l_quiz(module_code: str, request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    
+    module = next((m for m in L2L_MODULES if m["code"] == module_code), None)
+    if not module: raise HTTPException(404, "Module not found")
+    
+    score = 0
+    for i, q in enumerate(module["quiz"]):
+        user_ans = form_data.get(f"q_{i}")
+        if user_ans is not None and int(user_ans) == q["correct"]:
+            score += 1
+            
+    max_score = len(module["quiz"])
+    passed = (score / max_score) >= 0.8 # 80% required to pass
+    
+    progress = db.query(L2LProgress).filter(L2LProgress.participant_id == pid, L2LProgress.module_code == module_code).first()
+    if not progress:
+        progress = L2LProgress(participant_id=pid, module_code=module_code)
+        db.add(progress)
+        
+    progress.quiz_score = score
+    progress.quiz_max = max_score
+    progress.completed = passed
+    db.commit()
+    
+    return RedirectResponse(url=f"/learning-to-learn?result={'pass' if passed else 'fail'}&score={score}/{max_score}&module={module['title']}", status_code=303)
+
+
+# ==========================================
 # FACILITATOR & INIT ROUTES
 # ==========================================
 @app.get("/facilitator", response_class=HTMLResponse)
@@ -710,7 +782,8 @@ def init_db(db = Depends(get_db)):
     courses_to_seed = [
         ("NYS-IDP", "NYS IDP: Think & Grow Rich 30-Day Challenge", "Master your mindset, build definite purpose, and take daily action over 30 days."),
         ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
-        ("MAYO-AI", "MAYO AI Fluency Programme", "Master responsible AI use, from core foundations to practical business, creative, or community applications.")
+        ("MAYO-AI", "MAYO AI Fluency Programme", "Master responsible AI use, from core foundations to practical business, creative, or community applications."),
+        ("MAYO-L2L", "Learning to Learn: Master Your Brain", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
     ]
     
     for code, title, desc in courses_to_seed:

@@ -42,7 +42,8 @@ class Participant(Base):
     nemisa_assignments = relationship("NemisaAssignment", back_populates="participant")
     enrollments = relationship("Enrollment", back_populates="participant")
     ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant") # <-- MAKE SURE THIS IS HERE
-
+    l2l_progress = relationship("L2LProgress", back_populates="participant")
+    
 class Course(Base): # NEW
     __tablename__ = "courses"
     id = Column(Integer, primary_key=True, index=True)
@@ -146,3 +147,16 @@ class AIFluencyProgress(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     
     participant = relationship("Participant", back_populates="ai_fluency_progress")
+
+    class L2LProgress(Base):
+    __tablename__ = "l2l_progress"
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(String, ForeignKey("participants.participant_id"))
+    module_code = Column(String)
+    quiz_score = Column(Integer, default=0)
+    quiz_max = Column(Integer, default=0)
+    completed = Column(Boolean, default=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    participant = relationship("Participant")
+
