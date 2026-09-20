@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="mb-8">
+        <h2 class="text-3xl font-bold text-gray-900">MAYO AI Fluency Programme</h2>
+        <p class="text-gray-600 mt-2">Learn → Practise → Produce → Demonstrate → Reflect. Complete the core modules, then choose your specialist pathway.</p>
+    </div>
+
+    <div id="loading" class="text-center py-20">
+        <p class="text-gray-600">Loading your AI modules...</p>
+    </div>
+
+    <div id="ai-content" class="hidden space-y-8">
+        <!-- Core Progress Bar -->
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500">
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Core AI Foundation Progress</h3>
+            <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+                <div id="core-progress-bar" class="bg-indigo-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <p class="text-sm text-gray-600 text-right"><span id="core-progress-text">0</span>% Complete (4 Core Modules Required)</p>
+        </div>
+
+        <!-- Core Modules -->
+        <div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm">Compulsory</span>
+                Core AI Modules
+            </h3>
+            <div id="core-modules" class="grid md:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- Elective Pathways -->
+        <div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">Elective</span>
+                Specialist Pathways (Choose 1 or more)
+            </h3>
+            <div id="elective-modules" class="grid md:grid-cols-2 gap-4"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Evidence Submission Modal -->
+<div id="evidence-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 m-4">
+        <h3 class="text-xl font-bold text-gray-900 mb-2">Submit Evidence: <span id="modal-module-name" class="text-indigo-600"></span></h3>
+        <p class="text-sm text-gray-600 mb-4 italic" id="modal-evidence-prompt"></p>
+        
+        <form id="evidence-form" method="POST" action="/api/ai-fluency/submit">
+            <input type="hidden" name="participant_id" id="modal-pid">
+            <input type="hidden" name="module_code" id="modal-module-code">
+            
+            <label class="block text-sm font-bold text-gray-700 mb-2">Your Evidence / Reflection:</label>
+            <textarea name="evidence" rows="5" required class="w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500" placeholder="Describe what you built, learned, or produced..."></textarea>
+            
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="document.getElementById('evidence-modal').classList.add('hidden')" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="submit" class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">Submit Evidence</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const rawPid = localStorage.getItem('nys_participant_id');
+    const pid = rawPid ? rawPid.trim().toUpperCase() : null;
+
+    if (!pid) {
+        window.location.href = '/login';
+    } else {
+        fetch(`/api/ai-fluency/${pid}`)
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(data => {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('ai-content').classList.remove('hidden');
+                
+                document.getElementById('core-progress-bar').style.width = data.core_progress + '%';
+                document.getElementById('core-progress-text').textContent = data.core_progress;
+                
+                const coreContainer = document.getElementById('core-modules');
+                const electiveContainer = document.getElementById('elective-modules');
+                
+                data.modules.forEach(m => {
+                    const isCore = m.type === 'Core';
+                    const container = isCore ? coreContainer : electiveContainer;
+                    const badgeColor = isCore ? 'bg-indigo-100 text-indigo-700' : 'bg-green-100 text-green-700';
+                    const statusHtml = m.completed 
+                        ? `<span class="text-green-600 font-bold text-sm flex items-center gap-1">✅ Complete</span>`
+                        : `<button onclick="openEvidenceModal('${m.code}', '${m.name.replace(/'/g, "\\'")}', '${m.evidence_prompt.replace(/'/g, "\\'")}')" class="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 transition">Submit Evidence</button>`;
+                    
+                    const card = `
+                        <div class="bg-white p-5 rounded-lg shadow border-l-4 ${m.completed ? 'border-green-500' : 'border-gray-300'}">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs font-bold px-2 py-1 rounded ${badgeColor}">${m.type} • ${m.hours} hrs</span>
+                                ${statusHtml}
+                            </div>
+                            <h4 class="font-bold text-gray-900 mb-2">${m.name}</h4>
+                            ${m.completed ? `<div class="bg-gray-50 p-3 rounded text-sm text-gray-700"><strong>Evidence:</strong> ${m.evidence}</div>` : ''}
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            })
+            .catch(err => {
+                document.getElementById('loading').innerHTML = `<p class="text-red-600">Error loading AI modules. <a href="/login" class="underline">Login again</a>.</p>`;
+            });
+    }
+
+    function openEvidenceModal(code, name, prompt) {
+        document.getElementById('modal-pid').value = pid;
+        document.getElementById('modal-module-code').value = code;
+        document.getElementById('modal-module-name').textContent = name;
+        document.getElementById('modal-evidence-prompt').textContent = "Prompt: " + prompt;
+        document.getElementById('evidence-modal').classList.remove('hidden');
+    }
+</script>
+{% endblock %}

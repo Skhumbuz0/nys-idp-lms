@@ -42,6 +42,8 @@ class Participant(Base):
     nemisa_assignments = relationship("NemisaAssignment", back_populates="participant")
     enrollments = relationship("Enrollment", back_populates="participant") # NEW
 
+    ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant")
+
 class Course(Base): # NEW
     __tablename__ = "courses"
     id = Column(Integer, primary_key=True, index=True)
@@ -133,4 +135,15 @@ class NemisaWeeklyReport(Base):
     blockers = Column(String)
     support_needed = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+class AIFluencyProgress(Base):
+    __tablename__ = "ai_fluency_progress"
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(String, ForeignKey("participants.participant_id"))
+    module_code = Column(String)
+    module_name = Column(String)
+    completed = Column(Boolean, default=False)
+    evidence = Column(String, nullable=True)  # Text description of the project/evidence
+    timestamp = Column(DateTime, default=datetime.utcnow)
     
+    participant = relationship("Participant")

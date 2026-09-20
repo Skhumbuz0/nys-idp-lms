@@ -345,6 +345,19 @@ WEEK_INFO = {
     4: {"title": "Execute & Persist", "chapters": [13,14,15], "max_score": 45, "description": "Chapters 13-15"}
 }
 
+AI_MODULES = [
+    {"code": "AI-CORE-1", "name": "AI Fluency: Framework and foundations", "type": "Core", "hours": 4, "evidence_prompt": "Describe how you applied the 4D framework (Delegation, Description, Discernment, Diligence) to a real task."},
+    {"code": "AI-CORE-2", "name": "AI capabilities and limitations", "type": "Core", "hours": 3.5, "evidence_prompt": "Share an example where you identified an AI limitation or hallucination and how you corrected it."},
+    {"code": "AI-CORE-3", "name": "Claude 101", "type": "Core", "hours": 2.5, "evidence_prompt": "Provide a prompt you built using Projects, Artifacts, or Skills, and the result it produced."},
+    {"code": "AI-CORE-4", "name": "AI Fluency for students", "type": "Core", "hours": 3, "evidence_prompt": "Describe your new AI-assisted learning or career planning workflow."},
+    {"code": "AI-ELEC-1", "name": "AI Fluency for small businesses", "type": "Elective: Business", "hours": 4, "evidence_prompt": "Submit your AI-assisted business opportunity document (idea, customer profile, value prop)."},
+    {"code": "AI-ELEC-2", "name": "AI Fluency for builders", "type": "Elective: Technology", "hours": 4, "evidence_prompt": "Describe the working prototype you built to solve a community problem."},
+    {"code": "AI-ELEC-3", "name": "AI Fluency for creative work", "type": "Elective: Creative", "hours": 4, "evidence_prompt": "Share the digital campaign concept and content calendar you generated."},
+    {"code": "AI-ELEC-4", "name": "AI Fluency for nonprofits", "type": "Elective: Community", "hours": 4, "evidence_prompt": "Explain how you used AI to improve a real NPO or community process."},
+    {"code": "AI-ELEC-5", "name": "AI Fluency for educators", "type": "Elective: Education", "hours": 4, "evidence_prompt": "Describe the AI-assisted lesson plan or educational tool you developed."}
+]
+
+
 def generate_participant_id(db) -> str:
     highest = 0
     for (pid,) in db.query(Participant.participant_id).all():
@@ -589,6 +602,93 @@ async def process_daily_action(day: int, request: Request, db = Depends(get_db))
     return RedirectResponse(url=f"/daily-action/{next_day}" if next_day <= 30 else "/my-progress", status_code=303)
 
 # ==========================================
+# MAYO AI FLUENCY ROUTES
+# ==========================================
+@app.get("/ai-fluency", response_class=HTMLResponse)
+def ai_fluency_dashboard(request: Request):
+    return templates.TemplateResponse(request=request, name="ai_fluency.html", context={})
+
+@app.get("/api/ai-fluency/{pid}")
+def get_ai_fluency_data(pid: str, db = Depends(get_db)):
+    pid = pid.upper().strip()
+    p = db.query(Participant).filter(Participant.participant_id == pid).first()
+    if not p: raise HTTPException(status_code=404, detail="Participant not found")
+    
+    progress_records = db.query(AIFluencyProgress).filter(AIFluencyProgress.participant_id == pid).all()
+    completed_codes = {r.module_code for r in progress_records if r.completed}
+    
+    # Calculate progress: 4 Core modules = 100% of core requirement
+    core_completed = sum(1 for m in AI_MODULES if m["type"] == "Core" and m["code"] in completed_codes)
+    core_progress = int((core_completed / 4) * 100)
+    
+    # Update enrollment progress
+    enrollment = db.query(Enrollment).filter(Enrollment.participant_id == pid, Enrollment.course_code == "MAYO-AI").first()
+    if enrollment:
+        enrollment.progress_pct = float(core_progress)
+        db.commit()
+    
+    modules_data = []
+    for m in AI_MODULES:
+        record = next((r for r in progress_records if r.module_code == m["code"]), None)
+        modules_data.append({
+            "code": m["code"],
+            "name": m["name"],
+            "type": m["type"],
+            "hours": m["hours"],
+            "evidence_prompt": m["evidence_prompt"],
+            "completed": record.completed if record else False,
+            "evidence": record.evidence if record else ""
+        })
+        
+    return {"participant": {"id": p.participant_id, "name": p.full_name}, "modules": modules_data, "core_progress": core_progress}
+
+@app.post("/api/ai-fluency/submit")
+async def submit_ai_evidence(request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    module_code = form_data.get("module_code")
+    evidence = form_data.get("evidence", "")
+    
+    p = db.query(Participant).filter(Participant.participant_id == pid).first()
+    if not p: raise HTTPException(status_code=404, detail="Participant not found")
+    
+    module_info = next((m for m in AI_MODULES if m["code"] == module_code), None)
+    if not module_info: raise HTTPException(status_code=404, detail="Module not found")
+    
+    record = db.query(AIFluencyProgress).filter(
+        AIFluencyProgress.participant_id == pid, 
+        AIFluencyProgress.module_code == module_code
+    ).first()
+    
+    if record:
+        record.completed = True
+        record.evidence = evidence
+        record.timestamp = datetime.utcnow()
+    else:
+        db.add(AIFluencyProgress(
+            participant_id=pid,
+            module_code=module_code,
+            module_name=module_info["name"],
+            completed=True,
+            evidence=evidence
+        ))
+    
+    db.commit()
+    
+    # Recalculate and update enrollment progress
+    progress_records = db.query(AIFluencyProgress).filter(AIFluencyProgress.participant_id == pid).all()
+    completed_codes = {r.module_code for r in progress_records if r.completed}
+    core_completed = sum(1 for m in AI_MODULES if m["type"] == "Core" and m["code"] in completed_codes)
+    core_progress = int((core_completed / 4) * 100)
+    
+    enrollment = db.query(Enrollment).filter(Enrollment.participant_id == pid, Enrollment.course_code == "MAYO-AI").first()
+    if enrollment:
+        enrollment.progress_pct = float(core_progress)
+        db.commit()
+        
+    return RedirectResponse(url="/ai-fluency", status_code=303)
+
+# ==========================================
 # FACILITATOR & INIT ROUTES
 # ==========================================
 @app.get("/facilitator", response_class=HTMLResponse)
@@ -604,39 +704,32 @@ def facilitator_dashboard(request: Request, db = Depends(get_db)):
 
 @app.get("/init-db")
 def init_db(db = Depends(get_db)):
-    # 1. Create all tables (including the new Course and Enrollment tables)
     Base.metadata.create_all(bind=engine)
     
-    # 2. Seed the 2 main courses if the table is empty
-    if db.query(Course).count() == 0:
-        db.add(Course(
-            code="NYS-IDP", 
-            title="NYS IDP: Think & Grow Rich 30-Day Challenge", 
-            description="Master your mindset, build definite purpose, and take daily action over 30 days. Includes weekly knowledge quizzes."
-        ))
-        db.add(Course(
-            code="NEMISA-DIGITAL", 
-            title="NEMISA Digital Skills Programme", 
-            description="A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."
-        ))
-        db.commit()
-        print("✅ Courses seeded successfully.")
+    # Seed Courses
+    courses_to_seed = [
+        ("NYS-IDP", "NYS IDP: Think & Grow Rich 30-Day Challenge", "Master your mindset, build definite purpose, and take daily action over 30 days."),
+        ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
+        ("MAYO-AI", "MAYO AI Fluency Programme", "Master responsible AI use, from core foundations to practical business, creative, or community applications.")
+    ]
     
-    # 3. Retroactively enroll any existing participants who registered before this feature was added
+    for code, title, desc in courses_to_seed:
+        if not db.query(Course).filter(Course.code == code).first():
+            db.add(Course(code=code, title=title, description=desc))
+    db.commit()
+    
+    # Retroactively enroll existing participants in the new AI course
     participants = db.query(Participant).all()
     fixed_count = 0
     for p in participants:
-        existing_enrollments = db.query(Enrollment).filter(Enrollment.participant_id == p.participant_id).count()
-        if existing_enrollments == 0:
-            db.add(Enrollment(participant_id=p.participant_id, course_code="NYS-IDP", progress_pct=0.0))
-            db.add(Enrollment(participant_id=p.participant_id, course_code="NEMISA-DIGITAL", progress_pct=0.0))
+        existing = db.query(Enrollment).filter(Enrollment.participant_id == p.participant_id, Enrollment.course_code == "MAYO-AI").count()
+        if existing == 0:
+            db.add(Enrollment(participant_id=p.participant_id, course_code="MAYO-AI", progress_pct=0.0))
             fixed_count += 1
-            
     db.commit()
     
-    return {
-        "message": f"Database initialized! Courses seeded. Retroactively enrolled {fixed_count} existing participants."
-    }
+    return {"message": f"Database initialized! Courses seeded. Retroactively enrolled {fixed_count} participants in MAYO AI."}
+
 
 @app.get("/seed-questions")
 def seed_questions(db = Depends(get_db)):
