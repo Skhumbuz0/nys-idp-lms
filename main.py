@@ -861,7 +861,7 @@ def init_db(db = Depends(get_db)):
         ("NYS-IDP", "NYS IDP: Think & Grow Rich 30-Day Challenge", "Master your mindset, build definite purpose, and take daily action over 30 days."),
         ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
         ("MAYO-AI", "MAYO AI Fluency Programme", "Master responsible AI use, from core foundations to practical business, creative, or community applications."),
-        ("MAYO-L2L", "Learning to Learn: Master Your Brain", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
+        ("MAYO-L2L", "MAYO Learning to Learn Programme", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
     ]
     
     for code, title, desc in courses_to_seed:
@@ -1297,7 +1297,7 @@ def enroll_all_courses(db = Depends(get_db)):
         ("NYS-IDP", "NYS IDP: Think & Grow Rich 30-Day Challenge", "Master your mindset, build definite purpose, and take daily action over 30 days. Includes weekly knowledge quizzes."),
         ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
         ("MAYO-AI", "MAYO AI Fluency Programme", "Master responsible AI use, from core foundations to practical business, creative, or community applications."),
-        ("MAYO-L2L", "Learning to Learn: Master Your Brain", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
+        ("MAYO-L2L", "MAYO Learning to Learn Programme", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
     ]
     
     # 1. Ensure all 4 courses exist in the database
