@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from database import Base, engine, get_db
 from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport, Course, Enrollment
-import resend
+import smtplib
+from email.message import EmailMessage
 
 app = FastAPI(title="MAYO Learner Management System")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -25,13 +26,28 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", "MAYO LMS <onboarding@resend.dev>")
 # EMAIL UTILITIES
 # ==========================================
 def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    if not RESEND_API_KEY:
-        print(f"⚠️ WARNING: RESEND_API_KEY not set. Email to {to_email} not sent.")
+    """Send an email using a Gmail App Password. Free and requires no domain."""
+    gmail_user = os.getenv("GMAIL_USER", "masango.pleasure@gmail.com")
+    gmail_password = os.getenv("GMAIL_APP_PASSWORD", "")
+    
+    if not gmail_password:
+        print(f"⚠️ WARNING: GMAIL_APP_PASSWORD not set. Email to {to_email} not sent.")
         return False
+    
     try:
-        resend.api_key = RESEND_API_KEY
-        resend.Emails.send({"from": FROM_EMAIL, "to": to_email, "subject": subject, "html": html_content})
-        print(f"✅ Email sent to {to_email}: {subject}")
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = f"MAYO LMS <{gmail_user}>"
+        msg['To'] = to_email
+        msg.set_content("Please view this email in an HTML-compatible email client.")
+        msg.add_alternative(html_content, subtype='html')
+        
+        # Connect to Gmail's SMTP server
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(gmail_user, gmail_password)
+            server.send_message(msg)
+            
+        print(f"✅ Email successfully sent to {to_email}")
         return True
     except Exception as e:
         print(f"❌ Email error for {to_email}: {e}")

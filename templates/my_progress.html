@@ -87,17 +87,20 @@
 
 <script>
     const rawPid = localStorage.getItem('nys_participant_id');
-    const pid = rawPid ? rawPid.trim() : null;
+    // Force clean, uppercase, trimmed ID
+    const pid = rawPid ? rawPid.trim().toUpperCase() : null;
     
-    if (!pid || pid === 'null' || pid === 'undefined') {
+    console.log("🔍 Attempting to load progress for PID:", pid);
+
+    if (!pid || pid === 'NULL' || pid === 'UNDEFINED') {
         document.getElementById('not-logged-in').classList.remove('hidden');
         document.getElementById('loading').classList.add('hidden');
     } else {
         fetch(`/api/participant/${pid}`)
             .then(async r => {
                 if (!r.ok) {
-                    const errorText = await r.text();
-                    throw new Error(`Server returned ${r.status}: ${errorText}`);
+                    const errorData = await r.json().catch(() => ({}));
+                    throw new Error(`Server returned ${r.status}: ${errorData.detail || r.statusText}`);
                 }
                 return r.json();
             })
@@ -150,11 +153,12 @@
                 }
             })
             .catch(err => {
-                console.error("Progress fetch error:", err);
+                console.error("❌ Progress fetch error:", err);
                 document.getElementById('loading').innerHTML = `
                     <div class="text-red-600 text-center">
                         <p class="text-xl font-bold mb-2">❌ Error Loading Data</p>
-                        <p class="mb-4">${err.message}</p>
+                        <p class="mb-4 text-sm bg-red-50 p-3 rounded border border-red-200">${err.message}</p>
+                        <p class="mb-4 text-sm">Check your browser Console (F12) for the exact ID being requested.</p>
                         <a href="/login" class="underline font-bold">Click here to login again</a>
                     </div>
                 `;
