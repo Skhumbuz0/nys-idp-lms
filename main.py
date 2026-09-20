@@ -1309,7 +1309,7 @@ def enroll_all_ai(db = Depends(get_db)):
 
 @app.get("/enroll-all-courses")
 def enroll_all_courses(db = Depends(get_db)):
-    """Guarantees all 4 courses exist and enrolls every participant in all of them."""
+    """Guarantees all 4 courses exist with correct titles and enrolls every participant."""
     courses_to_seed = [
         ("NYS-IDP", "NYS IDP: Think & Grow Rich 30-Day Challenge", "Master your mindset, build definite purpose, and take daily action over 30 days. Includes weekly knowledge quizzes."),
         ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
@@ -1317,10 +1317,16 @@ def enroll_all_courses(db = Depends(get_db)):
         ("MAYO-L2L", "MAYO Learning to Learn Programme", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
     ]
     
-    # 1. Ensure all 4 courses exist in the database
+    # 1. Ensure all 4 courses exist AND update their titles/descriptions if they already exist
     for code, title, desc in courses_to_seed:
-        if not db.query(Course).filter(Course.code == code).first():
+        course = db.query(Course).filter(Course.code == code).first()
+        if not course:
             db.add(Course(code=code, title=title, description=desc))
+        else:
+            # Update the title and description to the new wording
+            course.title = title
+            course.description = desc
+            
     db.commit()
     
     # 2. Enroll every participant in ALL 4 courses if they aren't already
@@ -1345,4 +1351,4 @@ def enroll_all_courses(db = Depends(get_db)):
                 enrollments_added += 1
                 
     db.commit()
-    return {"message": f"✅ All 4 courses confirmed. Added {enrollments_added} missing course enrollments for existing participants."}
+    return {"message": f"✅ All 4 courses confirmed and titles updated. Added {enrollments_added} missing course enrollments."}
