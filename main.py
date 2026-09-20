@@ -776,9 +776,10 @@ def facilitator_dashboard(request: Request, db = Depends(get_db)):
 
 @app.get("/init-db")
 def init_db(db = Depends(get_db)):
+    # 1. Create all tables (including new ones like AIFluencyProgress, L2LProgress)
     Base.metadata.create_all(bind=engine)
     
-    # Seed Courses
+    # 2. Seed the 4 main courses if they don't exist yet
     courses_to_seed = [
         ("NYS-IDP", "NYS IDP: Think & Grow Rich 30-Day Challenge", "Master your mindset, build definite purpose, and take daily action over 30 days."),
         ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
@@ -791,18 +792,33 @@ def init_db(db = Depends(get_db)):
             db.add(Course(code=code, title=title, description=desc))
     db.commit()
     
-    # Retroactively enroll existing participants in the new AI course
+    # 3. Retroactively enroll ALL existing participants in ALL 4 courses
     participants = db.query(Participant).all()
-    fixed_count = 0
+    all_courses = ["NYS-IDP", "NEMISA-DIGITAL", "MAYO-AI", "MAYO-L2L"]
+    enrollments_added = 0
+    
     for p in participants:
-        existing = db.query(Enrollment).filter(Enrollment.participant_id == p.participant_id, Enrollment.course_code == "MAYO-AI").count()
-        if existing == 0:
-            db.add(Enrollment(participant_id=p.participant_id, course_code="MAYO-AI", progress_pct=0.0))
-            fixed_count += 1
+        for course_code in all_courses:
+            # Check if this specific participant is already enrolled in this specific course
+            existing = db.query(Enrollment).filter(
+                Enrollment.participant_id == p.participant_id,
+                Enrollment.course_code == course_code
+            ).first()
+            
+            if not existing:
+                db.add(Enrollment(
+                    participant_id=p.participant_id, 
+                    course_code=course_code, 
+                    progress_pct=0.0,
+                    status="Active"
+                ))
+                enrollments_added += 1
+                
     db.commit()
     
-    return {"message": f"Database initialized! Courses seeded. Retroactively enrolled {fixed_count} participants in MAYO AI."}
-
+    return {
+        "message": f"Database initialized! 4 courses seeded. Added {enrollments_added} missing course enrollments for existing participants."
+    }
 
 @app.get("/seed-questions")
 def seed_questions(db = Depends(get_db)):
