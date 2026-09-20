@@ -703,32 +703,49 @@ def l2l_dashboard(request: Request):
 
 @app.get("/api/l2l/{pid}")
 def get_l2l_data(pid: str, db = Depends(get_db)):
-    pid = pid.upper().strip()
-    progress_records = db.query(L2LProgress).filter(L2LProgress.participant_id == pid).all()
-    progress_map = {r.module_code: r for r in progress_records}
-    
-    modules_data = []
-    for m in L2L_MODULES:
-        record = progress_map.get(m["code"])
-        modules_data.append({
-            "code": m["code"],
-            "title": m["title"],
-            "icon": m["icon"],
-            "completed": record.completed if record else False,
-            "score": f"{record.quiz_score}/{record.quiz_max}" if record else "0/0"
-        })
+    try:
+        pid = pid.upper().strip()
         
-    completed_count = sum(1 for m in modules_data if m["completed"])
-    overall_pct = int((completed_count / len(L2L_MODULES)) * 100)
-    
-    # Update enrollment progress
-    enrollment = db.query(Enrollment).filter(Enrollment.participant_id == pid, Enrollment.course_code == "MAYO-L2L").first()
-    if enrollment:
-        enrollment.progress_pct = float(overall_pct)
-        db.commit()
+        # Ensure L2L_MODULES is imported
+        try:
+            from l2l_data import L2L_MODULES
+        except ImportError:
+            raise Exception("l2l_data.py is missing or L2L_MODULES is not defined inside it.")
+            
+        # Ensure L2LProgress is imported at the top of main.py
+        progress_records = db.query(L2LProgress).filter(L2LProgress.participant_id == pid).all()
+        progress_map = {r.module_code: r for r in progress_records}
         
-    return {"modules": modules_data, "overall_pct": overall_pct}
+        modules_data = []
+        for m in L2L_MODULES:
+            record = progress_map.get(m["code"])
+            modules_data.append({
+                "code": m["code"],
+                "title": m["title"],
+                "icon": m.get("icon", "📘"),
+                "completed": record.completed if record else False,
+                "score": f"{record.quiz_score}/{record.quiz_max}" if record else "0/0"
+            })
+            
+        completed_count = sum(1 for m in modules_data if m["completed"])
+        overall_pct = int((completed_count / len(L2L_MODULES)) * 100) if L2L_MODULES else 0
+        
+        # Update enrollment progress
+        enrollment = db.query(Enrollment).filter(Enrollment.participant_id == pid, Enrollment.course_code == "MAYO-L2L").first()
+        if enrollment:
+            enrollment.progress_pct = float(overall_pct)
+            db.commit()
+            
+        return {"modules": modules_data, "overall_pct": overall_pct}
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ L2L API CRASHED:\n{error_details}")
+        # Return the full traceback to the browser so we can see it!
+        raise HTTPException(status_code=500, detail=f"Python Error: {str(e)}\n\nTraceback:\n{error_details}")
 
+    
 @app.get("/l2l/module/{module_code}", response_class=HTMLResponse)
 def l2l_module_view(request: Request, module_code: str):
     module = next((m for m in L2L_MODULES if m["code"] == module_code), None)
