@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
-    <h1 class="text-5xl font-bold text-gray-900 mb-4">MAYO Learner Management System</h1>
+<div class="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+    <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">MAYO Learner Management System</h1>
     <p class="text-xl text-gray-600 mb-8 max-w-2xl">Empowering your personal and professional growth through structured learning, daily action, and digital skills mastery.</p>
     
-    <div class="flex flex-col sm:flex-row gap-4">
+    <!-- Shows only if NOT logged in -->
+    <div id="guest-actions" class="flex flex-col sm:flex-row gap-4">
         <a href="/login" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition shadow-lg text-lg">
             🔑 Login to Your Account
         </a>
@@ -12,16 +13,20 @@
             📝 New Participant Registration
         </a>
     </div>
-    
-    <div class="mt-16 grid md:grid-cols-2 gap-8 max-w-4xl w-full text-left">
-        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-purple-500">
-            <h3 class="text-xl font-bold text-gray-900 mb-2">📘 NYS IDP: Think & Grow Rich</h3>
-            <p class="text-gray-600">A 30-day challenge to master your mindset, build definite purpose, and take daily action, complete with weekly knowledge quizzes.</p>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-green-500">
-            <h3 class="text-xl font-bold text-gray-900 mb-2">💻 NEMISA Digital Skills</h3>
-            <p class="text-gray-600">A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps.</p>
-        </div>
+
+    <!-- Shows only if logged in -->
+    <div id="learner-actions" class="hidden">
+        <a href="/learner-dashboard" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition shadow-lg text-lg">
+            📚 Go to My Courses
+        </a>
     </div>
 </div>
+
+<script>
+    // Hide guest actions and show learner actions if logged in
+    if (localStorage.getItem('nys_participant_id')) {
+        document.getElementById('guest-actions').classList.add('hidden');
+        document.getElementById('learner-actions').classList.remove('hidden');
+    }
+</script>
 {% endblock %}
