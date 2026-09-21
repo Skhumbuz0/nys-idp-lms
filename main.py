@@ -8,6 +8,7 @@ from l2l_games import (
     LearningPlanGenerator, ProcrastinationEngine, LeitnerFlashcardEngine,
     ExamStrategyEngine, MetacognitiveFeynmanEngine
 )
+from employment_data import EMPLOYMENT_MODULES
 from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
@@ -885,6 +886,55 @@ async def evaluate_feynman(request: Request):
     )
 
 # ==========================================
+# MAYO EMPLOYMENT READINESS ROUTES
+# ==========================================
+@app.get("/employment", response_class=HTMLResponse)
+def employment_dashboard(request: Request):
+    return templates.TemplateResponse(request=request, name="employment_dashboard.html", context={"modules": EMPLOYMENT_MODULES})
+
+@app.get("/api/employment/{pid}")
+def get_employment_data(pid: str, db = Depends(get_db)):
+    try:
+        pid = pid.upper().strip()
+        # For now, we just return the module structure. 
+        # In Phase 3, we will query EmploymentProfile, JobApplication, etc.
+        modules_data = [{"code": m["code"], "title": m["title"], "icon": m["icon"], "completed": False} for m in EMPLOYMENT_MODULES]
+        return {"modules": modules_data, "overall_pct": 0}
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}\n{traceback.format_exc()}")
+
+@app.get("/employment/module/{module_code}", response_class=HTMLResponse)
+def employment_module_overview(request: Request, module_code: str):
+    module = next((m for m in EMPLOYMENT_MODULES if m["code"] == module_code), None)
+    if not module:
+        raise HTTPException(404, "Module not found")
+    return templates.TemplateResponse(request=request, name="employment_module_overview.html", context={"module": module})
+
+@app.get("/employment/module/{module_code}/sub/{sub_index}", response_class=HTMLResponse)
+def employment_submodule_view(request: Request, module_code: str, sub_index: int):
+    module = next((m for m in EMPLOYMENT_MODULES if m["code"] == module_code), None)
+    if not module or sub_index < 0 or sub_index >= len(module["submodules"]):
+        raise HTTPException(404, "Sub-module not found")
+    
+    submodule = module["submodules"][sub_index]
+    total_subs = len(module["submodules"])
+    progress_percent = int(((sub_index + 1) / total_subs) * 100)
+    
+    return templates.TemplateResponse(request=request, name="employment_submodule.html", context={
+        "module": module, "submodule": submodule, "sub_index": sub_index, 
+        "total_subs": total_subs, "has_prev": sub_index > 0, "has_next": sub_index < total_subs - 1,
+        "progress_percent": progress_percent
+    })
+
+@app.get("/employment/module/{module_code}/quiz", response_class=HTMLResponse)
+def employment_quiz_view(request: Request, module_code: str):
+    module = next((m for m in EMPLOYMENT_MODULES if m["code"] == module_code), None)
+    if not module: raise HTTPException(404, "Module not found")
+    return templates.TemplateResponse(request=request, name="employment_quiz.html", context={"module": module})
+
+
+# ==========================================
 # FACILITATOR & INIT ROUTES
 # ==========================================
 @app.get("/facilitator", response_class=HTMLResponse)
@@ -1345,6 +1395,8 @@ def enroll_all_courses(db = Depends(get_db)):
         ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
         ("MAYO-AI", "MAYO AI Fluency Programme", "Master responsible AI use, from core foundations to practical business, creative, or community applications."),
         ("MAYO-L2L", "MAYO Learning to Learn Programme", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
+        ("MAYO-EMPLOYMENT", "MAYO Employment Readiness", "Build Your CV. Apply With Confidence. Track Your Progress.")
+        
     ]
     
     # 1. Ensure all 4 courses exist AND update their titles/descriptions if they already exist

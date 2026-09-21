@@ -74,6 +74,18 @@
                         barColor = 'bg-orange-600';
                         route = '/learning-to-learn';    
                     
+                    } else if (course.code === 'MAYO-L2L') {
+                        colorClass = 'border-orange-500';
+                        btnColor = 'bg-orange-600 hover:bg-orange-700';
+                        barColor = 'bg-orange-600';
+                        route = '/learning-to-learn';
+                    
+                    } else if (course.code === 'MAYO-EMPLOYMENT') { // ADD THIS
+                        colorClass = 'border-blue-500';
+                        btnColor = 'bg-blue-600 hover:bg-blue-700';
+                        barColor = 'bg-blue-600';
+                        route = '/employment';
+                  
                     } else {
                         // Fallback for any future courses
                         colorClass = 'border-gray-500';
