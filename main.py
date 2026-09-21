@@ -9,7 +9,7 @@ from l2l_games import (
     ExamStrategyEngine, MetacognitiveFeynmanEngine
 )
 from employment_data import EMPLOYMENT_MODULES
-from models import ..., EmploymentDocument # Add EmploymentDocument to your existing imports
+from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport, Course, Enrollment, AIFluencyProgress, L2LProgress, EmploymentProfile, EmploymentExperience, JobOpportunity, JobApplication, EmploymentWeeklyReport, EmploymentDocument
 from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
