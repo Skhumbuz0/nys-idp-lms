@@ -1051,6 +1051,29 @@ async def submit_application(request: Request, db = Depends(get_db)):
     ))
     db.commit()
     return RedirectResponse(url="/employment/tracker", status_code=303)
+@app.post("/employment/quiz/{module_code}")
+async def submit_employment_quiz(module_code: str, request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    
+    module = next((m for m in EMPLOYMENT_MODULES if m["code"] == module_code), None)
+    if not module: raise HTTPException(404, "Module not found")
+    
+    score = 0
+    for i, q in enumerate(module["quiz"]):
+        user_ans = form_data.get(f"q_{i}")
+        if user_ans is not None and int(user_ans) == q["correct"]:
+            score += 1
+            
+    max_score = len(module["quiz"])
+    passed = (score / max_score) >= 0.8
+    
+    # For Phase 1, we'll just track completion simply. 
+    # In Phase 3, we will add a dedicated EmploymentProgress table.
+    
+    return RedirectResponse(url=f"/employment/module/{module_code}/quiz?result={'pass' if passed else 'fail'}&score={score}/{max_score}", status_code=303)
+
+
 
 # ==========================================
 # FACILITATOR & INIT ROUTES

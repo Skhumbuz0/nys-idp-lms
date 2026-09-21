@@ -4,9 +4,9 @@
     <!-- Breadcrumb & Header -->
     <div class="mb-6">
         <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
-            <a href="/learning-to-learn" class="hover:text-blue-600">Course</a>
+            <a href="/employment" class="hover:text-blue-600">Course</a>
             <span>›</span>
-            <a href="/l2l/module/{{ module.code }}" class="hover:text-blue-600">{{ module.icon }} {{ module.title }}</a>
+            <a href="/employment/module/{{ module.code }}" class="hover:text-blue-600">{{ module.icon }} {{ module.title }}</a>
             <span>›</span>
             <span class="text-gray-900 font-semibold">Sub-Module {{ submodule.number }}</span>
         </div>
@@ -21,51 +21,35 @@
         </div>
     </div>
 
-    <!-- Content Card (NOW FIRST) -->
+    <!-- Content Card -->
     <div class="bg-white rounded-xl shadow-lg p-6 md:p-10 mb-6">
         <div class="prose max-w-none text-gray-800 leading-relaxed">
             {{ submodule.content_html | safe }}
         </div>
     </div>
 
-    <!-- Image Display (NOW BELOW CONTENT) -->
-    <div class="mb-6">
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-            <img src="/static/Image_{{ submodule.number }}.png" 
-                 alt="Illustration for Sub-Module {{ submodule.number }}"
-                 class="w-full h-auto max-h-[500px] object-contain bg-gray-50"
-                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
-            <div class="hidden w-full h-64 bg-gradient-to-br from-blue-100 to-blue-200 items-center justify-center text-gray-500">
-                <div class="text-center">
-                    <span class="text-6xl mb-2 block">📖</span>
-                    <p class="text-sm">Visual content for Sub-Module {{ submodule.number }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Navigation Buttons -->
     <div class="flex flex-col sm:flex-row justify-between gap-3 mb-6">
         {% if has_prev %}
-        <a href="/l2l/module/{{ module.code }}/sub/{{ sub_index - 1 }}" 
+        <a href="/employment/module/{{ module.code }}/sub/{{ sub_index - 1 }}" 
            class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition text-center">
             ← Previous Sub-Module
         </a>
         {% else %}
-        <a href="/l2l/module/{{ module.code }}" 
+        <a href="/employment/module/{{ module.code }}" 
            class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition text-center">
             ← Module Overview
         </a>
         {% endif %}
 
         {% if has_next %}
-        <a href="/l2l/module/{{ module.code }}/sub/{{ sub_index + 1 }}" 
+        <a href="/employment/module/{{ module.code }}/sub/{{ sub_index + 1 }}" 
            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition text-center shadow">
             Next Sub-Module →
         </a>
         {% else %}
-        <a href="/l2l/module/{{ module.code }}/quiz" 
-           class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition text-center shadow">
+        <a href="/employment/module/{{ module.code }}/quiz" 
+           class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition text-center shadow">
             📝 Take the Quiz →
         </a>
         {% endif %}
@@ -75,11 +59,9 @@
     <div class="bg-gray-50 p-4 rounded-lg text-center">
         <p class="text-sm text-gray-600 mb-2">Need to review?</p>
         <div class="flex flex-wrap justify-center gap-2">
-            <a href="/l2l/module/{{ module.code }}" class="text-blue-600 hover:underline text-sm">📋 Module Overview</a>
+            <a href="/employment/module/{{ module.code }}" class="text-blue-600 hover:underline text-sm">📋 Module Overview</a>
             <span class="text-gray-400">•</span>
-            <a href="/l2l/module/{{ module.code }}/quiz" class="text-purple-600 hover:underline text-sm">📝 Quiz</a>
-            <span class="text-gray-400">•</span>
-            <a href="/l2l/game/{{ module.code }}" class="text-indigo-600 hover:underline text-sm">🎮 Game</a>
+            <a href="/employment/module/{{ module.code }}/quiz" class="text-blue-600 hover:underline text-sm">📝 Quiz</a>
         </div>
     </div>
 </div>

@@ -3,9 +3,9 @@
 <div class="max-w-5xl mx-auto">
     <div class="flex justify-between items-center mb-6 border-b pb-4">
         <div>
-            <a href="/learning-to-learn" class="text-blue-600 hover:underline text-sm">← Back to Course</a>
+            <a href="/employment" class="text-blue-600 hover:underline text-sm">← Back to Employment Course</a>
             <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ module.icon }} {{ module.title }}</h1>
-            <p class="text-gray-600 mt-1">Work through each sub-module, then take the quiz and play the game.</p>
+            <p class="text-gray-600 mt-1">Work through each sub-module, then take the quiz.</p>
         </div>
     </div>
 
@@ -14,7 +14,7 @@
         <h2 class="text-xl font-bold text-gray-800 mb-4">📖 Sub-Modules ({{ module.submodules|length }} lessons)</h2>
         <div class="grid md:grid-cols-2 gap-4">
             {% for sub in module.submodules %}
-            <a href="/l2l/module/{{ module.code }}/sub/{{ loop.index0 }}" 
+            <a href="/employment/module/{{ module.code }}/sub/{{ loop.index0 }}" 
                class="block bg-white p-5 rounded-xl shadow-md border-l-4 border-blue-400 hover:shadow-lg hover:border-blue-600 transition">
                 <div class="flex items-start justify-between">
                     <div class="flex-1">
@@ -29,20 +29,13 @@
         </div>
     </div>
 
-    <!-- Assessment & Games Section -->
-    <div class="grid md:grid-cols-2 gap-6">
-        <a href="/l2l/module/{{ module.code }}/quiz" 
-           class="bg-gradient-to-br from-purple-500 to-purple-700 text-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition">
+    <!-- Assessment Section (No Game for Employment Course) -->
+    <div class="grid md:grid-cols-1 gap-6">
+        <a href="/employment/module/{{ module.code }}/quiz" 
+           class="bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition">
             <h3 class="text-2xl font-bold mb-2">📝 Take the Quiz</h3>
-            <p class="text-purple-100 mb-4">Test your understanding with {{ module.quiz|length }} questions. Score 80%+ to pass.</p>
-            <span class="bg-white text-purple-700 font-bold py-2 px-4 rounded-lg inline-block">Start Quiz →</span>
-        </a>
-        
-        <a href="/l2l/game/{{ module.code }}" 
-           class="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition">
-            <h3 class="text-2xl font-bold mb-2">🎮 Play the Game</h3>
-            <p class="text-indigo-100 mb-4">Apply what you learned through an interactive simulation.</p>
-            <span class="bg-white text-indigo-700 font-bold py-2 px-4 rounded-lg inline-block">Launch Game →</span>
+            <p class="text-blue-100 mb-4">Test your understanding with {{ module.quiz|length }} questions. Score 80%+ to pass.</p>
+            <span class="bg-white text-blue-700 font-bold py-2 px-4 rounded-lg inline-block">Start Quiz →</span>
         </a>
     </div>
 </div>

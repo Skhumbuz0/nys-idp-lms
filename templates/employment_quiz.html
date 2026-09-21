@@ -4,9 +4,9 @@
     <!-- Header -->
     <div class="mb-6">
         <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
-            <a href="/learning-to-learn" class="hover:text-orange-600">Course</a>
+            <a href="/employment" class="hover:text-blue-600">Course</a>
             <span>›</span>
-            <a href="/l2l/module/{{ module.code }}" class="hover:text-orange-600">{{ module.icon }} {{ module.title }}</a>
+            <a href="/employment/module/{{ module.code }}" class="hover:text-blue-600">{{ module.icon }} {{ module.title }}</a>
             <span>›</span>
             <span class="text-gray-900 font-semibold">Quiz</span>
         </div>
@@ -14,7 +14,7 @@
         <p class="text-gray-600 mt-2">Score 80% or higher to pass this module.</p>
     </div>
 
-    <!-- Result Banner (if redirected from submission) -->
+    <!-- Result Banner -->
     {% if request.query_params.get('result') %}
         <div class="mb-6 p-6 rounded-xl {% if request.query_params.get('result') == 'pass' %}bg-green-100 border-2 border-green-500{% else %}bg-red-100 border-2 border-red-500{% endif %}">
             <p class="font-bold text-xl">
@@ -25,9 +25,9 @@
                 {% endif %}
             </p>
             <div class="mt-3 flex gap-3">
-                <a href="/l2l/module/{{ module.code }}" class="bg-white text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-100 transition">← Back to Module</a>
+                <a href="/employment/module/{{ module.code }}" class="bg-white text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-100 transition border">← Back to Module</a>
                 {% if request.query_params.get('result') == 'pass' %}
-                <a href="/learning-to-learn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition">Continue to Next Module →</a>
+                <a href="/employment" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition">Continue to Course →</a>
                 {% endif %}
             </div>
         </div>
@@ -35,7 +35,7 @@
 
     <!-- Quiz Form -->
     <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
-        <form method="POST" action="/l2l/quiz/{{ module.code }}" class="space-y-6">
+        <form method="POST" action="/employment/quiz/{{ module.code }}" class="space-y-6">
             <input type="hidden" name="participant_id" id="pid-input">
             
             {% for q in module.quiz %}
@@ -56,7 +56,7 @@
             {% endfor %}
 
             <div class="flex flex-col sm:flex-row gap-3 pt-4">
-                <a href="/l2l/module/{{ module.code }}" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition text-center">
+                <a href="/employment/module/{{ module.code }}" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition text-center">
                     ← Back to Module
                 </a>
                 <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
