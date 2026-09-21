@@ -52,7 +52,6 @@ EMPLOYMENT_MODULES = [
             {"q": "Which can be included as relevant experience?", "options": ["Only permanent employment", "Only university employment", "Volunteer work, projects, internships and other relevant activities", "Only jobs where the participant received a salary"], "correct": 2},
             {"q": "Why should participants connect a skill to evidence?", "options": ["It helps demonstrate that the participant genuinely possesses the skill", "It makes the CV longer", "It guarantees an interview", "It replaces qualifications"], "correct": 0},
             {"q": "Which is an example of a technical skill?", "options": ["Microsoft Excel", "Being friendly", "Motivation", "Positive attitude"], "correct": 0}
- “q”: “Which is an example of a technical skill?”, “options”: [“Microsoft Excel”, “Being friendly”, “Motivation”, “Positive attitude”], “correct”: 0}
         ]
     },
     {

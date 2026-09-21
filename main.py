@@ -1507,35 +1507,33 @@ def enroll_all_ai(db = Depends(get_db)):
 
 @app.get("/enroll-all-courses")
 def enroll_all_courses(db = Depends(get_db)):
-    """Guarantees all 4 courses exist with correct titles and enrolls every participant."""
+    """Guarantees all courses exist with correct titles and enrolls every participant."""
     courses_to_seed = [
         ("NYS-IDP", "NYS IDP: Think & Grow Rich 30-Day Challenge", "Master your mindset, build definite purpose, and take daily action over 30 days. Includes weekly knowledge quizzes."),
         ("NEMISA-DIGITAL", "NEMISA Digital Skills Programme", "A comprehensive 12-course learning path covering GitHub, Power Platform, AI, Azure, Cybersecurity, and DevOps."),
         ("MAYO-AI", "MAYO AI Fluency Programme", "Master responsible AI use, from core foundations to practical business, creative, or community applications."),
-        ("MAYO-L2L", "MAYO Learning to Learn Programme", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation.")
-        ("MAYO-EMPLOYMENT", "MAYO Employment Readiness", "Build Your CV. Apply With Confidence. Track Your Progress.")
-        
+        ("MAYO-L2L", "MAYO Learning to Learn Programme", "An 8-module masterclass on the neuroscience of learning, memory, focus, and exam preparation."),
+        ("MAYO-EMPLOYMENT", "MAYO Employment Readiness", "Build Your CV. Apply With Confidence. Track Your Progress. Get Ready for Work.")
     ]
     
-    # 1. Ensure all 4 courses exist AND update their titles/descriptions if they already exist
+    # 1. Ensure all courses exist AND update their titles/descriptions if they already exist
     for code, title, desc in courses_to_seed:
         course = db.query(Course).filter(Course.code == code).first()
         if not course:
             db.add(Course(code=code, title=title, description=desc))
         else:
-            # Update the title and description to the new wording
             course.title = title
             course.description = desc
             
     db.commit()
     
-    # 2. Enroll every participant in ALL 4 courses if they aren't already
+    # 2. Enroll every participant in ALL courses if they aren't already
     participants = db.query(Participant).all()
-    all_courses = ["NYS-IDP", "NEMISA-DIGITAL", "MAYO-AI", "MAYO-L2L"]
+    all_course_codes = [c[0] for c in courses_to_seed]
     enrollments_added = 0
     
     for p in participants:
-        for course_code in all_courses:
+        for course_code in all_course_codes:
             existing = db.query(Enrollment).filter(
                 Enrollment.participant_id == p.participant_id,
                 Enrollment.course_code == course_code
@@ -1551,4 +1549,4 @@ def enroll_all_courses(db = Depends(get_db)):
                 enrollments_added += 1
                 
     db.commit()
-    return {"message": f"✅ All 4 courses confirmed and titles updated. Added {enrollments_added} missing course enrollments."}
+    return {"message": f"✅ All courses confirmed and titles updated. Added {enrollments_added} missing course enrollments."}
