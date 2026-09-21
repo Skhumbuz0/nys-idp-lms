@@ -1,5 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
+
+    <!-- Interactive Toolkit Section -->
+    <div class="mb-10">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">🛠️ Employment Toolkit</h3>
+        <div class="grid md:grid-cols-3 gap-4">
+            <a href="/employment/cv-builder" class="block bg-blue-50 p-5 rounded-xl border-2 border-blue-200 hover:border-blue-500 hover:shadow-lg transition">
+                <span class="text-3xl mb-2 block">📄</span>
+                <h4 class="font-bold text-blue-900">Master CV Builder</h4>
+                <p class="text-sm text-blue-700 mt-1">Build and save your comprehensive employment profile.</p>
+            </a>
+            <a href="/employment/job-analyser" class="block bg-green-50 p-5 rounded-xl border-2 border-green-200 hover:border-green-500 hover:shadow-lg transition">
+                <span class="text-3xl mb-2 block">🔍</span>
+                <h4 class="font-bold text-green-900">Job Advert Analyser</h4>
+                <p class="text-sm text-green-700 mt-1">Decode requirements and save opportunities.</p>
+            </a>
+            <a href="/employment/tracker" class="block bg-purple-50 p-5 rounded-xl border-2 border-purple-200 hover:border-purple-500 hover:shadow-lg transition">
+                <span class="text-3xl mb-2 block">📊</span>
+                <h4 class="font-bold text-purple-900">Application Tracker</h4>
+                <p class="text-sm text-purple-700 mt-1">Log submissions, track statuses, and manage follow-ups.</p>
+            </a>
+        </div>
+    </div>
+
+    <h3 class="text-xl font-bold text-gray-800 mb-4">📚 Course Modules</h3>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Existing module loop here -->
+
 <div class="max-w-5xl mx-auto">
     <div class="mb-8">
         <h2 class="text-3xl font-bold text-gray-900">MAYO Employment Readiness</h2>
@@ -15,4 +42,6 @@
         {% endfor %}
     </div>
 </div>
+
+
 {% endblock %}

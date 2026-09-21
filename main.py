@@ -9,6 +9,7 @@ from l2l_games import (
     ExamStrategyEngine, MetacognitiveFeynmanEngine
 )
 from employment_data import EMPLOYMENT_MODULES
+from models import ..., EmploymentDocument # Add EmploymentDocument to your existing imports
 from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
@@ -933,6 +934,123 @@ def employment_quiz_view(request: Request, module_code: str):
     if not module: raise HTTPException(404, "Module not found")
     return templates.TemplateResponse(request=request, name="employment_quiz.html", context={"module": module})
 
+# ==========================================
+# MAYO EMPLOYMENT TOOLKIT ROUTES (PHASE 2)
+# ==========================================
+
+@app.get("/employment/cv-builder", response_class=HTMLResponse)
+def cv_builder(request: Request):
+    return templates.TemplateResponse(request=request, name="cv_builder.html", context={})
+
+@app.post("/employment/cv-builder")
+async def save_cv_profile(request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    
+    # Save or Update Profile
+    profile = db.query(EmploymentProfile).filter(EmploymentProfile.participant_id == pid).first()
+    if not profile:
+        profile = EmploymentProfile(participant_id=pid)
+        db.add(profile)
+    
+    profile.professional_name = form_data.get("professional_name")
+    profile.professional_email = form_data.get("professional_email")
+    profile.phone = form_data.get("phone")
+    profile.city = form_data.get("city")
+    profile.province = form_data.get("province")
+    profile.professional_profile = form_data.get("professional_profile")
+    profile.career_objective = form_data.get("career_objective")
+    profile.profile_completed = True
+    db.commit()
+    
+    # Save Experience (Simplified for Phase 2: saves as a single text block, can be expanded later)
+    experience = form_data.get("experience_text", "")
+    if experience:
+        db.add(EmploymentExperience(
+            participant_id=pid,
+            experience_type="general",
+            organisation="Various",
+            position="Various Roles",
+            description=experience,
+            currently_active=False
+        ))
+        db.commit()
+        
+    return RedirectResponse(url="/employment/cv-builder?saved=true", status_code=303)
+
+@app.get("/employment/job-analyser", response_class=HTMLResponse)
+def job_analyser(request: Request):
+    return templates.TemplateResponse(request=request, name="job_analyser.html", context={})
+
+@app.post("/employment/job-analyser")
+async def save_job_opportunity(request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    
+    db.add(JobOpportunity(
+        participant_id=pid,
+        employer=form_data.get("employer"),
+        position=form_data.get("position"),
+        reference_number=form_data.get("reference_number"),
+        location=form_data.get("location"),
+        source=form_data.get("source"),
+        closing_date=form_data.get("closing_date"),
+        requirements=form_data.get("requirements"),
+        application_method=form_data.get("application_method"),
+        is_active=True
+    ))
+    db.commit()
+    return RedirectResponse(url="/employment/job-analyser?saved=true", status_code=303)
+
+@app.get("/employment/tracker", response_class=HTMLResponse)
+def application_tracker(request: Request):
+    return templates.TemplateResponse(request=request, name="tracker.html", context={})
+
+@app.get("/api/employment/tracker/{pid}")
+def get_tracker_data(pid: str, db = Depends(get_db)):
+    pid = pid.upper().strip()
+    applications = db.query(JobApplication).filter(JobApplication.participant_id == pid).order_by(JobApplication.date_applied.desc()).all()
+    
+    # Calculate stats
+    total = len(applications)
+    interviews = sum(1 for a in applications if a.status == "Interview")
+    followups = sum(1 for a in applications if a.status == "Follow-up Due")
+    
+    apps_data = [{
+        "id": a.id,
+        "employer": a.opportunity.employer if a.opportunity else "Unknown",
+        "position": a.opportunity.position if a.opportunity else "Unknown",
+        "date_applied": a.date_applied,
+        "status": a.status,
+        "follow_up_date": a.follow_up_date,
+        "outcome": a.outcome
+    } for a in applications]
+    
+    return {"total": total, "interviews": interviews, "followups": followups, "applications": apps_data}
+
+@app.get("/employment/tracker/add", response_class=HTMLResponse)
+def add_application(request: Request, db = Depends(get_db)):
+    # Fetch user's saved opportunities for the dropdown
+    pid = request.query_params.get("pid", "")
+    opportunities = db.query(JobOpportunity).filter(JobOpportunity.participant_id == pid.upper().strip(), JobOpportunity.is_active == True).all()
+    return templates.TemplateResponse(request=request, name="tracker_add.html", context={"opportunities": opportunities})
+
+@app.post("/employment/tracker/add")
+async def submit_application(request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    opp_id = form_data.get("opportunity_id")
+    
+    db.add(JobApplication(
+        participant_id=pid,
+        opportunity_id=int(opp_id) if opp_id else None,
+        date_applied=form_data.get("date_applied"),
+        status=form_data.get("status", "Submitted"),
+        follow_up_date=form_data.get("follow_up_date"),
+        notes=form_data.get("notes")
+    ))
+    db.commit()
+    return RedirectResponse(url="/employment/tracker", status_code=303)
 
 # ==========================================
 # FACILITATOR & INIT ROUTES

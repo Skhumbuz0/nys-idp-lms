@@ -44,7 +44,7 @@ class Participant(Base):
     ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant") # <-- MAKE SURE THIS IS HERE
     l2l_progress = relationship("L2LProgress", back_populates="participant")
     employment_profile = relationship("EmploymentProfile", back_populates="participant")
-    
+
 class Course(Base): # NEW
     __tablename__ = "courses"
     id = Column(Integer, primary_key=True, index=True)
@@ -236,3 +236,16 @@ class EmploymentWeeklyReport(Base):
     reflection = Column(String, nullable=True)
     
     participant = relationship("Participant")
+
+
+class EmploymentDocument(Base):
+    __tablename__ = "employment_documents"
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(String, ForeignKey("participants.participant_id"))
+    document_type = Column(String) # 'master_cv', 'targeted_cv', 'cover_letter'
+    content = Column(String) # JSON or HTML content
+    job_opportunity_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    participant = relationship("Participant")
+    
