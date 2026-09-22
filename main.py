@@ -15,7 +15,13 @@ from l2l_games import (
     ExamStrategyEngine, MetacognitiveFeynmanEngine
 )
 from employment_data import EMPLOYMENT_MODULES
-from models import Participant, Question, QuizResponse, DailyResponse, NemisaCourse, NemisaAssignment, NemisaWeeklyReport, Course, Enrollment, AIFluencyProgress, L2LProgress, EmploymentProfile, EmploymentExperience, JobOpportunity, JobApplication, EmploymentWeeklyReport, EmploymentDocument
+from models import (
+    Participant, Question, QuizResponse, DailyResponse, NemisaCourse, 
+    NemisaAssignment, NemisaWeeklyReport, Course, Enrollment, 
+    AIFluencyProgress, L2LProgress,
+    EmploymentProfile, EmploymentExperience, JobOpportunity, 
+    JobApplication, EmploymentWeeklyReport, EmploymentDocument, EmploymentProgress
+)
 from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
@@ -903,10 +909,24 @@ def employment_dashboard(request: Request):
 def get_employment_data(pid: str, db = Depends(get_db)):
     try:
         pid = pid.upper().strip()
-        # For now, we just return the module structure. 
-        # In Phase 3, we will query EmploymentProfile, JobApplication, etc.
-        modules_data = [{"code": m["code"], "title": m["title"], "icon": m["icon"], "completed": False} for m in EMPLOYMENT_MODULES]
-        return {"modules": modules_data, "overall_pct": 0}
+        progress_records = db.query(EmploymentProgress).filter(EmploymentProgress.participant_id == pid).all()
+        progress_map = {r.module_code: r for r in progress_records}
+        
+        modules_data = []
+        for m in EMPLOYMENT_MODULES:
+            record = progress_map.get(m["code"])
+            modules_data.append({
+                "code": m["code"],
+                "title": m["title"],
+                "icon": m.get("icon", "💼"),
+                "completed": record.completed if record else False,
+                "score": f"{record.quiz_score}/{record.quiz_max}" if record else "0/0"
+            })
+            
+        completed_count = sum(1 for m in modules_data if m["completed"])
+        overall_pct = int((completed_count / len(EMPLOYMENT_MODULES)) * 100) if EMPLOYMENT_MODULES else 0
+        
+        return {"modules": modules_data, "overall_pct": overall_pct}
     except Exception as e:
         import traceback
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}\n{traceback.format_exc()}")
@@ -1067,6 +1087,7 @@ async def save_cv_profile(
     
     db.commit()
     return RedirectResponse(url=f"/employment/cv-builder?saved=true&pid={pid}", status_code=303)
+
 @app.get("/employment/cv-builder/export")
 def export_cv_docx(request: Request, db = Depends(get_db)):
     from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -1079,18 +1100,18 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
     experiences = db.query(EmploymentExperience).filter(EmploymentExperience.participant_id == pid.upper().strip()).all()
     
     if not profile:
-        return {"error": "Profile not found. Please fill out the CV builder first."}
+        return {"error": "Profile not found."}
 
     doc = Document()
     
-    # Adjust margins for a professional, compact look
+    # Professional margins
     for section in doc.sections:
         section.top_margin = Inches(0.5)
         section.bottom_margin = Inches(0.5)
         section.left_margin = Inches(0.75)
         section.right_margin = Inches(0.75)
 
-    # --- HEADER WITH PHOTO (2-Column Table) ---
+    # --- HEADER WITH PHOTO ---
     header_table = doc.add_table(rows=1, cols=2)
     header_table.alignment = WD_TABLE_ALIGNMENT.CENTER
     
@@ -1100,7 +1121,7 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
     name_run = name_para.add_run((profile.professional_name or "YOUR NAME").upper())
     name_run.font.size = Pt(22)
     name_run.font.bold = True
-    name_run.font.color.rgb = RGBColor(0, 51, 102) # Professional Dark Blue
+    name_run.font.color.rgb = RGBColor(0, 51, 102)
     
     contact_para = cell_left.add_paragraph()
     contact_run = contact_para.add_run(f"📞 {profile.phone or ''} | 📧 {profile.professional_email or ''} | 📍 {profile.city or ''}, {profile.province or ''}")
@@ -1110,19 +1131,21 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
     cell_right = header_table.cell(0, 1)
     cell_right.width = Inches(1.5)
     if profile.photo_path:
-        # Convert web path (/static/uploads/...) to absolute server path
+        # Resolve absolute path for Render Linux environment
         abs_photo_path = os.path.join(os.getcwd(), profile.photo_path.lstrip('/'))
         if os.path.exists(abs_photo_path):
-            pic_para = cell_right.paragraphs[0]
-            pic_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             try:
+                pic_para = cell_right.paragraphs[0]
+                pic_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 pic_para.add_picture(abs_photo_path, width=Inches(1.2))
             except Exception as e:
-                print(f"Error adding picture: {e}")
+                print(f"CV Export Image Error: {e}")
+        else:
+            print(f"Image not found at server path: {abs_photo_path}")
 
     doc.add_paragraph() # Spacer
 
-    # Helper function for consistent section headings
+    # Helper for consistent headings
     def add_heading(title):
         h = doc.add_heading(title.upper(), level=2)
         h.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -1132,41 +1155,37 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
             run.font.color.rgb = RGBColor(0, 51, 102)
         doc.add_paragraph()
 
-    # --- PROFILE ---
+    # 1. PROFILE
     if profile.professional_profile:
         add_heading("PROFILE")
         p = doc.add_paragraph(profile.professional_profile)
-        for run in p.runs:
-            run.font.size = Pt(11)
+        for run in p.runs: run.font.size = Pt(11)
 
-    # --- CORE COMPETENCIES ---
+    # 2. CORE COMPETENCIES
     if profile.core_competencies:
         add_heading("CORE COMPETENCIES")
         for item in profile.core_competencies.split('\n'):
             if item.strip():
                 p = doc.add_paragraph(item.strip(), style='List Bullet')
-                for run in p.runs:
-                    run.font.size = Pt(11)
+                for run in p.runs: run.font.size = Pt(11)
 
-    # --- CERTIFICATIONS ---
+    # 3. CERTIFICATIONS
     if profile.certifications:
         add_heading("CERTIFICATIONS")
         for item in profile.certifications.split('\n'):
             if item.strip():
                 p = doc.add_paragraph(item.strip(), style='List Bullet')
-                for run in p.runs:
-                    run.font.size = Pt(11)
+                for run in p.runs: run.font.size = Pt(11)
 
-    # --- SKILLS ---
+    # 4. SKILLS
     if profile.skills:
         add_heading("SKILLS")
         for item in profile.skills.split('\n'):
             if item.strip():
                 p = doc.add_paragraph(item.strip(), style='List Bullet')
-                for run in p.runs:
-                    run.font.size = Pt(11)
+                for run in p.runs: run.font.size = Pt(11)
 
-    # --- PERSONAL DETAILS ---
+    # 5. PERSONAL DETAILS
     add_heading("PERSONAL DETAILS")
     details_table = doc.add_table(rows=6, cols=2)
     details_table.style = 'Normal Table'
@@ -1186,14 +1205,14 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
         row.cells[1].text = value
     doc.add_paragraph()
 
-    # --- EDUCATION ---
+    # 6. EDUCATION
     add_heading("EDUCATION")
     p = doc.add_paragraph()
     p.add_run("National Senior Certificate (Grade 12)\n").bold = True
     p.add_run("King Makhosonke II Secondary School (2024)").italic = True
     doc.add_paragraph()
 
-    # --- WORK EXPERIENCE ---
+    # 7. WORK EXPERIENCE
     add_heading("WORK EXPERIENCE")
     for exp in experiences:
         p = doc.add_paragraph()
@@ -1202,12 +1221,11 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
         
         for line in exp.description.split('\n'):
             if line.strip():
-                # Clean up any manual bullet characters the user might have pasted
                 clean_line = line.strip().lstrip('•-–*')
                 doc.add_paragraph(clean_line, style='List Bullet')
         doc.add_paragraph()
 
-    # --- REFERENCES ---
+    # 8. REFERENCES
     if profile.references:
         add_heading("REFERENCES")
         for ref in profile.references.split('\n'):
@@ -1220,6 +1238,7 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
     doc.save(filepath)
     
     return FileResponse(filepath, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename=filename)
+
 
 @app.get("/employment/job-analyser", response_class=HTMLResponse)
 def job_analyser(request: Request, db = Depends(get_db)):
@@ -1360,6 +1379,39 @@ async def submit_weekly_report(request: Request, db = Depends(get_db)):
     db.commit()
     
     return RedirectResponse(url=f"/employment/weekly-report?saved=true&pid={pid}", status_code=303)
+
+@app.post("/employment/quiz/{module_code}")
+async def submit_employment_quiz(module_code: str, request: Request, db = Depends(get_db)):
+    form_data = await request.form()
+    pid = str(form_data.get("participant_id", "")).strip().upper()
+    
+    module = next((m for m in EMPLOYMENT_MODULES if m["code"] == module_code), None)
+    if not module: raise HTTPException(404, "Module not found")
+    
+    score = 0
+    for i, q in enumerate(module["quiz"]):
+        user_ans = form_data.get(f"q_{i}")
+        if user_ans is not None and int(user_ans) == q["correct"]:
+            score += 1
+            
+    max_score = len(module["quiz"])
+    passed = (score / max_score) >= 0.8
+    
+    progress = db.query(EmploymentProgress).filter(
+        EmploymentProgress.participant_id == pid, 
+        EmploymentProgress.module_code == module_code
+    ).first()
+    
+    if not progress:
+        progress = EmploymentProgress(participant_id=pid, module_code=module_code)
+        db.add(progress)
+        
+    progress.quiz_score = score
+    progress.quiz_max = max_score
+    progress.completed = passed
+    db.commit()
+    
+    return RedirectResponse(url=f"/employment/module/{module_code}/quiz?result={'pass' if passed else 'fail'}&score={score}/{max_score}", status_code=303)
 
 
 # ==========================================
