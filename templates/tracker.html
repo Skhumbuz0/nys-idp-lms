@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <a href="/employment" class="text-blue-600 hover:underline text-sm">← Back to Employment Course</a>
+            <h1 class="text-3xl font-bold text-gray-900 mt-2">📊 Application Tracker</h1>
+        </div>
+        <a href="/employment/tracker/add" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition shadow">+ Log New Application</a>
+    </div>
+
+    {% if request.query_params.get('saved') %}
+    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded">
+        ✅ Application logged successfully!
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-6 rounded-xl shadow border-l-4 border-blue-500">
+            <p class="text-gray-500 text-sm font-bold uppercase">Total</p>
+            <p class="text-4xl font-bold text-gray-900" id="stat-total">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow border-l-4 border-green-500">
+            <p class="text-gray-500 text-sm font-bold uppercase">Submitted</p>
+            <p class="text-4xl font-bold text-gray-900" id="stat-submitted">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow border-l-4 border-purple-500">
+            <p class="text-gray-500 text-sm font-bold uppercase">Interviews</p>
+            <p class="text-4xl font-bold text-gray-900" id="stat-interviews">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow border-l-4 border-yellow-500">
+            <p class="text-gray-500 text-sm font-bold uppercase">Follow-ups</p>
+            <p class="text-4xl font-bold text-gray-900" id="stat-followups">0</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="p-4 bg-gray-50 border-b font-bold text-gray-700">Recent Applications</div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-100 text-gray-600 uppercase">
+                    <tr>
+                        <th class="p-4">Employer</th>
+                        <th class="p-4">Position</th>
+                        <th class="p-4">Date Applied</th>
+                        <th class="p-4">Status</th>
+                        <th class="p-4">Follow-up</th>
+                        <th class="p-4">Outcome</th>
+                    </tr>
+                </thead>
+                <tbody id="tracker-table-body" class="divide-y divide-gray-200">
+                    <tr><td colspan="6" class="p-8 text-center text-gray-500">Loading applications...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const pid = localStorage.getItem('nys_participant_id')?.trim().toUpperCase();
+    if (pid) {
+        fetch(`/api/employment/tracker/${pid}`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('stat-total').textContent = data.total;
+                document.getElementById('stat-submitted').textContent = data.submitted;
+                document.getElementById('stat-interviews').textContent = data.interviews;
+                document.getElementById('stat-followups').textContent = data.followups;
+                
+                const tbody = document.getElementById('tracker-table-body');
+                tbody.innerHTML = '';
+                
+                if (data.applications.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-500">No applications logged yet.</td></tr>';
+                } else {
+                    data.applications.forEach(app => {
+                        let statusColor = app.status === 'Interview' ? 'bg-green-100 text-green-800' : 
+                                          app.status === 'Follow-up Due' ? 'bg-yellow-100 text-yellow-800' : 
+                                          app.status === 'Submitted' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800';
+                        
+                        tbody.innerHTML += `
+                            <tr class="hover:bg-gray-50">
+                                <td class="p-4 font-semibold">${app.employer}</td>
+                                <td class="p-4">${app.position}</td>
+                                <td class="p-4">${app.date_applied}</td>
+                                <td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${statusColor}">${app.status}</span></td>
+                                <td class="p-4">${app.follow_up_date}</td>
+                                <td class="p-4">${app.outcome}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+    }
+</script>
+{% endblock %}

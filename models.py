@@ -175,6 +175,8 @@ class EmploymentProfile(Base):
     professional_profile = Column(String, nullable=True)
     career_objective = Column(String, nullable=True)
     profile_completed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     participant = relationship("Participant")
 
@@ -182,14 +184,16 @@ class EmploymentExperience(Base):
     __tablename__ = "employment_experiences"
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
-    experience_type = Column(String) # employment, volunteer, internship, project, etc.
+    experience_type = Column(String)
     organisation = Column(String)
     position = Column(String)
     start_date = Column(String)
     end_date = Column(String, nullable=True)
     description = Column(String)
-    skills_used = Column(String)
+    skills_used = Column(String, nullable=True)
+    achievements = Column(String, nullable=True)
     currently_active = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     participant = relationship("Participant")
 
@@ -201,27 +205,33 @@ class JobOpportunity(Base):
     position = Column(String)
     reference_number = Column(String, nullable=True)
     location = Column(String, nullable=True)
-    source = Column(String) # SAYouth, ESSA, LinkedIn, etc.
+    source = Column(String)
+    job_url = Column(String, nullable=True)
     closing_date = Column(String, nullable=True)
-    requirements = Column(String) # JSON string of requirements
+    requirements = Column(String)
     application_method = Column(String)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     participant = relationship("Participant")
+    applications = relationship("JobApplication", back_populates="opportunity")
 
 class JobApplication(Base):
     __tablename__ = "job_applications"
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
-    opportunity_id = Column(Integer, ForeignKey("job_opportunities.id"))
+    opportunity_id = Column(Integer, ForeignKey("job_opportunities.id"), nullable=True)
     date_applied = Column(String, nullable=True)
-    status = Column(String, default="Preparing") # Preparing, Submitted, Follow-up Due, Interview, Unsuccessful, etc.
+    status = Column(String, default="Preparing")
     follow_up_date = Column(String, nullable=True)
+    response_date = Column(String, nullable=True)
     outcome = Column(String, nullable=True)
     notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     participant = relationship("Participant")
-    opportunity = relationship("JobOpportunity")
+    opportunity = relationship("JobOpportunity", back_populates="applications")
 
 class EmploymentWeeklyReport(Base):
     __tablename__ = "employment_weekly_reports"
@@ -229,21 +239,31 @@ class EmploymentWeeklyReport(Base):
     participant_id = Column(String, ForeignKey("participants.participant_id"))
     week_start = Column(String)
     week_end = Column(String)
-    applications_submitted = Column(Integer, default=0)
+    application_target = Column(Integer, default=5)
+    jobs_found = Column(Integer, default=0)
+    jobs_analysed = Column(Integer, default=0)
     cvs_tailored = Column(Integer, default=0)
     cover_letters_written = Column(Integer, default=0)
+    applications_submitted = Column(Integer, default=0)
     followups_completed = Column(Integer, default=0)
+    interviews_received = Column(Integer, default=0)
+    responses_received = Column(Integer, default=0)
     reflection = Column(String, nullable=True)
+    what_worked = Column(String, nullable=True)
+    what_did_not_work = Column(String, nullable=True)
+    lessons_learned = Column(String, nullable=True)
+    next_week_action = Column(String, nullable=True)
+    submitted = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     participant = relationship("Participant")
-
 
 class EmploymentDocument(Base):
     __tablename__ = "employment_documents"
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
-    document_type = Column(String) # 'master_cv', 'targeted_cv', 'cover_letter'
-    content = Column(String) # JSON or HTML content
+    document_type = Column(String)
+    content = Column(String)
     job_opportunity_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     

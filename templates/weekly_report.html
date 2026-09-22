@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="mb-6">
+        <a href="/employment" class="text-blue-600 hover:underline text-sm">← Back to Employment Course</a>
+        <h1 class="text-3xl font-bold text-gray-900 mt-2">📅 Weekly Employment Report</h1>
+        <p class="text-gray-600">Track your weekly job-search activity and reflect on your progress.</p>
+    </div>
+
+    {% if request.query_params.get('saved') %}
+    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded">
+        ✅ Weekly report submitted successfully!
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/employment/weekly-report" class="bg-white p-6 rounded-xl shadow-lg space-y-6">
+        <input type="hidden" name="participant_id" id="pid-input">
+        
+        <div class="grid md:grid-cols-2 gap-4">
+            <div><label class="block text-sm font-bold text-gray-700">Week Start</label><input type="date" name="week_start" class="w-full p-2 border rounded mt-1" required></div>
+            <div><label class="block text-sm font-bold text-gray-700">Week End</label><input type="date" name="week_end" class="w-full p-2 border rounded mt-1" required></div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+            <div><label class="block text-sm font-bold text-gray-700">Application Target</label><input type="number" name="application_target" value="5" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">Jobs Found</label><input type="number" name="jobs_found" value="0" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">Jobs Analysed</label><input type="number" name="jobs_analysed" value="0" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">CVs Tailored</label><input type="number" name="cvs_tailored" value="0" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">Cover Letters</label><input type="number" name="cover_letters_written" value="0" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">Applications Submitted</label><input type="number" name="applications_submitted" value="0" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">Follow-ups Completed</label><input type="number" name="followups_completed" value="0" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">Interviews Received</label><input type="number" name="interviews_received" value="0" class="w-full p-2 border rounded mt-1"></div>
+            <div><label class="block text-sm font-bold text-gray-700">Responses Received</label><input type="number" name="responses_received" value="0" class="w-full p-2 border rounded mt-1"></div>
+        </div>
+
+        <div class="border-t pt-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">Weekly Reflection</h3>
+            <div class="space-y-3">
+                <div><label class="block text-sm font-bold text-gray-700">What worked well?</label><textarea name="what_worked" rows="2" class="w-full p-2 border rounded mt-1"></textarea></div>
+                <div><label class="block text-sm font-bold text-gray-700">What did not work?</label><textarea name="what_did_not_work" rows="2" class="w-full p-2 border rounded mt-1"></textarea></div>
+                <div><label class="block text-sm font-bold text-gray-700">Lessons learned</label><textarea name="lessons_learned" rows="2" class="w-full p-2 border rounded mt-1"></textarea></div>
+                <div><label class="block text-sm font-bold text-gray-700">Next week's action plan</label><textarea name="next_week_action" rows="2" class="w-full p-2 border rounded mt-1"></textarea></div>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition shadow-lg">
+            💾 Submit Weekly Report
+        </button>
+    </form>
+
+    {% if reports %}
+    <div class="mt-8">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Previous Reports</h3>
+        <div class="space-y-3">
+            {% for report in reports %}
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                <h4 class="font-bold text-gray-900">Week: {{ report.week_start }} to {{ report.week_end }}</h4>
+                <p class="text-sm text-gray-600">Applications: {{ report.applications_submitted }} | Interviews: {{ report.interviews_received }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+<script>document.getElementById('pid-input').value = localStorage.getItem('nys_participant_id')?.trim().toUpperCase();</script>
+{% endblock %}

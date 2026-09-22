@@ -935,11 +935,19 @@ def employment_quiz_view(request: Request, module_code: str):
     return templates.TemplateResponse(request=request, name="employment_quiz.html", context={"module": module})
 
 # ==========================================
-# MAYO EMPLOYMENT TOOLKIT ROUTES (PHASE 2)
+# MAYO EMPLOYMENT TOOLKIT ROUTES (COMPLETE)
 # ==========================================
 
 @app.get("/employment/cv-builder", response_class=HTMLResponse)
-def cv_builder(request: Request):
+def cv_builder(request: Request, db = Depends(get_db)):
+    pid = request.query_params.get("pid", "")
+    if pid:
+        profile = db.query(EmploymentProfile).filter(EmploymentProfile.participant_id == pid.upper().strip()).first()
+        experiences = db.query(EmploymentExperience).filter(EmploymentExperience.participant_id == pid.upper().strip()).all()
+        return templates.TemplateResponse(request=request, name="cv_builder.html", context={
+            "profile": profile,
+            "experiences": experiences
+        })
     return templates.TemplateResponse(request=request, name="cv_builder.html", context={})
 
 @app.post("/employment/cv-builder")
@@ -947,7 +955,6 @@ async def save_cv_profile(request: Request, db = Depends(get_db)):
     form_data = await request.form()
     pid = str(form_data.get("participant_id", "")).strip().upper()
     
-    # Save or Update Profile
     profile = db.query(EmploymentProfile).filter(EmploymentProfile.participant_id == pid).first()
     if not profile:
         profile = EmploymentProfile(participant_id=pid)
@@ -961,46 +968,55 @@ async def save_cv_profile(request: Request, db = Depends(get_db)):
     profile.professional_profile = form_data.get("professional_profile")
     profile.career_objective = form_data.get("career_objective")
     profile.profile_completed = True
-    db.commit()
+    profile.updated_at = datetime.utcnow()
     
-    # Save Experience (Simplified for Phase 2: saves as a single text block, can be expanded later)
-    experience = form_data.get("experience_text", "")
-    if experience:
+    # Handle experience entries
+    experience_text = form_data.get("experience_text", "")
+    if experience_text.strip():
         db.add(EmploymentExperience(
             participant_id=pid,
             experience_type="general",
             organisation="Various",
             position="Various Roles",
-            description=experience,
+            description=experience_text,
             currently_active=False
         ))
-        db.commit()
-        
-    return RedirectResponse(url="/employment/cv-builder?saved=true", status_code=303)
+    
+    db.commit()
+    return RedirectResponse(url=f"/employment/cv-builder?saved=true&pid={pid}", status_code=303)
 
 @app.get("/employment/job-analyser", response_class=HTMLResponse)
-def job_analyser(request: Request):
-    return templates.TemplateResponse(request=request, name="job_analyser.html", context={})
+def job_analyser(request: Request, db = Depends(get_db)):
+    pid = request.query_params.get("pid", "")
+    opportunities = []
+    if pid:
+        opportunities = db.query(JobOpportunity).filter(
+            JobOpportunity.participant_id == pid.upper().strip(),
+            JobOpportunity.is_active == True
+        ).order_by(JobOpportunity.created_at.desc()).all()
+    return templates.TemplateResponse(request=request, name="job_analyser.html", context={"opportunities": opportunities})
 
 @app.post("/employment/job-analyser")
 async def save_job_opportunity(request: Request, db = Depends(get_db)):
     form_data = await request.form()
     pid = str(form_data.get("participant_id", "")).strip().upper()
     
-    db.add(JobOpportunity(
+    new_opp = JobOpportunity(
         participant_id=pid,
         employer=form_data.get("employer"),
         position=form_data.get("position"),
-        reference_number=form_data.get("reference_number"),
-        location=form_data.get("location"),
-        source=form_data.get("source"),
-        closing_date=form_data.get("closing_date"),
-        requirements=form_data.get("requirements"),
-        application_method=form_data.get("application_method"),
+        reference_number=form_data.get("reference_number", ""),
+        location=form_data.get("location", ""),
+        source=form_data.get("source", ""),
+        closing_date=form_data.get("closing_date", ""),
+        requirements=form_data.get("requirements", ""),
+        application_method=form_data.get("application_method", "Online"),
         is_active=True
-    ))
+    )
+    db.add(new_opp)
     db.commit()
-    return RedirectResponse(url="/employment/job-analyser?saved=true", status_code=303)
+    
+    return RedirectResponse(url=f"/employment/job-analyser?saved=true&pid={pid}", status_code=303)
 
 @app.get("/employment/tracker", response_class=HTMLResponse)
 def application_tracker(request: Request):
@@ -1009,30 +1025,45 @@ def application_tracker(request: Request):
 @app.get("/api/employment/tracker/{pid}")
 def get_tracker_data(pid: str, db = Depends(get_db)):
     pid = pid.upper().strip()
-    applications = db.query(JobApplication).filter(JobApplication.participant_id == pid).order_by(JobApplication.date_applied.desc()).all()
+    applications = db.query(JobApplication).filter(
+        JobApplication.participant_id == pid
+    ).order_by(JobApplication.created_at.desc()).all()
     
-    # Calculate stats
     total = len(applications)
     interviews = sum(1 for a in applications if a.status == "Interview")
     followups = sum(1 for a in applications if a.status == "Follow-up Due")
+    submitted = sum(1 for a in applications if a.status == "Submitted")
     
-    apps_data = [{
-        "id": a.id,
-        "employer": a.opportunity.employer if a.opportunity else "Unknown",
-        "position": a.opportunity.position if a.opportunity else "Unknown",
-        "date_applied": a.date_applied,
-        "status": a.status,
-        "follow_up_date": a.follow_up_date,
-        "outcome": a.outcome
-    } for a in applications]
+    apps_data = []
+    for a in applications:
+        opp = db.query(JobOpportunity).filter(JobOpportunity.id == a.opportunity_id).first() if a.opportunity_id else None
+        apps_data.append({
+            "id": a.id,
+            "employer": opp.employer if opp else "Manual Entry",
+            "position": opp.position if opp else "Manual Entry",
+            "date_applied": a.date_applied or "N/A",
+            "status": a.status,
+            "follow_up_date": a.follow_up_date or "—",
+            "outcome": a.outcome or "Pending"
+        })
     
-    return {"total": total, "interviews": interviews, "followups": followups, "applications": apps_data}
+    return {
+        "total": total,
+        "interviews": interviews,
+        "followups": followups,
+        "submitted": submitted,
+        "applications": apps_data
+    }
 
 @app.get("/employment/tracker/add", response_class=HTMLResponse)
-def add_application(request: Request, db = Depends(get_db)):
-    # Fetch user's saved opportunities for the dropdown
+def add_application_form(request: Request, db = Depends(get_db)):
     pid = request.query_params.get("pid", "")
-    opportunities = db.query(JobOpportunity).filter(JobOpportunity.participant_id == pid.upper().strip(), JobOpportunity.is_active == True).all()
+    opportunities = []
+    if pid:
+        opportunities = db.query(JobOpportunity).filter(
+            JobOpportunity.participant_id == pid.upper().strip(),
+            JobOpportunity.is_active == True
+        ).all()
     return templates.TemplateResponse(request=request, name="tracker_add.html", context={"opportunities": opportunities})
 
 @app.post("/employment/tracker/add")
@@ -1041,38 +1072,58 @@ async def submit_application(request: Request, db = Depends(get_db)):
     pid = str(form_data.get("participant_id", "")).strip().upper()
     opp_id = form_data.get("opportunity_id")
     
-    db.add(JobApplication(
+    new_app = JobApplication(
         participant_id=pid,
-        opportunity_id=int(opp_id) if opp_id else None,
+        opportunity_id=int(opp_id) if opp_id and opp_id.isdigit() else None,
         date_applied=form_data.get("date_applied"),
         status=form_data.get("status", "Submitted"),
-        follow_up_date=form_data.get("follow_up_date"),
-        notes=form_data.get("notes")
-    ))
+        follow_up_date=form_data.get("follow_up_date", ""),
+        notes=form_data.get("notes", "")
+    )
+    db.add(new_app)
     db.commit()
-    return RedirectResponse(url="/employment/tracker", status_code=303)
-@app.post("/employment/quiz/{module_code}")
-async def submit_employment_quiz(module_code: str, request: Request, db = Depends(get_db)):
+    
+    return RedirectResponse(url=f"/employment/tracker?saved=true&pid={pid}", status_code=303)
+
+@app.get("/employment/weekly-report", response_class=HTMLResponse)
+def weekly_report_form(request: Request, db = Depends(get_db)):
+    pid = request.query_params.get("pid", "")
+    reports = []
+    if pid:
+        reports = db.query(EmploymentWeeklyReport).filter(
+            EmploymentWeeklyReport.participant_id == pid.upper().strip()
+        ).order_by(EmploymentWeeklyReport.created_at.desc()).all()
+    return templates.TemplateResponse(request=request, name="weekly_report.html", context={"reports": reports})
+
+@app.post("/employment/weekly-report")
+async def submit_weekly_report(request: Request, db = Depends(get_db)):
     form_data = await request.form()
     pid = str(form_data.get("participant_id", "")).strip().upper()
     
-    module = next((m for m in EMPLOYMENT_MODULES if m["code"] == module_code), None)
-    if not module: raise HTTPException(404, "Module not found")
+    new_report = EmploymentWeeklyReport(
+        participant_id=pid,
+        week_start=form_data.get("week_start"),
+        week_end=form_data.get("week_end"),
+        application_target=int(form_data.get("application_target", 5)),
+        jobs_found=int(form_data.get("jobs_found", 0)),
+        jobs_analysed=int(form_data.get("jobs_analysed", 0)),
+        cvs_tailored=int(form_data.get("cvs_tailored", 0)),
+        cover_letters_written=int(form_data.get("cover_letters_written", 0)),
+        applications_submitted=int(form_data.get("applications_submitted", 0)),
+        followups_completed=int(form_data.get("followups_completed", 0)),
+        interviews_received=int(form_data.get("interviews_received", 0)),
+        responses_received=int(form_data.get("responses_received", 0)),
+        reflection=form_data.get("reflection", ""),
+        what_worked=form_data.get("what_worked", ""),
+        what_did_not_work=form_data.get("what_did_not_work", ""),
+        lessons_learned=form_data.get("lessons_learned", ""),
+        next_week_action=form_data.get("next_week_action", ""),
+        submitted=True
+    )
+    db.add(new_report)
+    db.commit()
     
-    score = 0
-    for i, q in enumerate(module["quiz"]):
-        user_ans = form_data.get(f"q_{i}")
-        if user_ans is not None and int(user_ans) == q["correct"]:
-            score += 1
-            
-    max_score = len(module["quiz"])
-    passed = (score / max_score) >= 0.8
-    
-    # For Phase 1, we'll just track completion simply. 
-    # In Phase 3, we will add a dedicated EmploymentProgress table.
-    
-    return RedirectResponse(url=f"/employment/module/{module_code}/quiz?result={'pass' if passed else 'fail'}&score={score}/{max_score}", status_code=303)
-
+    return RedirectResponse(url=f"/employment/weekly-report?saved=true&pid={pid}", status_code=303)
 
 
 # ==========================================
