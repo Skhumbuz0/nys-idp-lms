@@ -41,18 +41,18 @@ class Participant(Base):
     daily_responses = relationship("DailyResponse", back_populates="participant")
     nemisa_assignments = relationship("NemisaAssignment", back_populates="participant")
     enrollments = relationship("Enrollment", back_populates="participant")
-    ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant") # <-- MAKE SURE THIS IS HERE
+    ai_fluency_progress = relationship("AIFluencyProgress", back_populates="participant")
     l2l_progress = relationship("L2LProgress", back_populates="participant")
     employment_profile = relationship("EmploymentProfile", back_populates="participant")
 
-class Course(Base): # NEW
+class Course(Base):
     __tablename__ = "courses"
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String, unique=True, index=True)
     title = Column(String)
     description = Column(String)
 
-class Enrollment(Base): # NEW
+class Enrollment(Base):
     __tablename__ = "enrollments"
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"))
@@ -161,8 +161,6 @@ class L2LProgress(Base):
     
     participant = relationship("Participant")
 
-# Add these to the bottom of models.py
-
 class EmploymentProfile(Base):
     __tablename__ = "employment_profiles"
     id = Column(Integer, primary_key=True, index=True)
@@ -188,17 +186,17 @@ class EmploymentProfile(Base):
     professional_profile = Column(String, nullable=True)
     career_objective = Column(String, nullable=True)
     
-    # Lists (stored as newline-separated text or JSON)
+    # Lists
     core_competencies = Column(String, nullable=True)
     certifications = Column(String, nullable=True)
     skills = Column(String, nullable=True)
-    references = Column(String, nullable=True) # Format: "Name - Title, Org | Phone | Email"
+    references = Column(String, nullable=True)
     
     profile_completed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    participant = relationship("Participant")
+    participant = relationship("Participant", back_populates="employment_profile")
 
 class EmploymentExperience(Base):
     __tablename__ = "employment_experiences"
@@ -288,15 +286,15 @@ class EmploymentDocument(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     participant = relationship("Participant")
+
+class EmploymentProgress(Base):
+    __tablename__ = "employment_progress"
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(String, ForeignKey("participants.participant_id"))
+    module_code = Column(String)
+    quiz_score = Column(Integer, default=0)
+    quiz_max = Column(Integer, default=0)
+    completed = Column(Boolean, default=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
     
-    class EmploymentProgress(Base):
-        __tablename__ = "employment_progress"
-        id = Column(Integer, primary_key=True, index=True)
-        participant_id = Column(String, ForeignKey("participants.participant_id"))
-        module_code = Column(String)
-        quiz_score = Column(Integer, default=0)
-        quiz_max = Column(Integer, default=0)
-        completed = Column(Boolean, default=False)
-        timestamp = Column(DateTime, default=datetime.utcnow)
-        
-        participant = relationship("Participant")
+    participant = relationship("Participant")
