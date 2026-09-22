@@ -290,18 +290,6 @@ class EmploymentDocument(Base):
     participant = relationship("Participant")
     
     class EmploymentProgress(Base):
-    __tablename__ = "employment_progress"
-    id = Column(Integer, primary_key=True, index=True)
-    participant_id = Column(String, ForeignKey("participants.participant_id"))
-    module_code = Column(String)
-    quiz_score = Column(Integer, default=0)
-    quiz_max = Column(Integer, default=0)
-    completed = Column(Boolean, default=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    
-    participant = relationship("Participant")
-    
-    class EmploymentProgress(Base):
         __tablename__ = "employment_progress"
         id = Column(Integer, primary_key=True, index=True)
         participant_id = Column(String, ForeignKey("participants.participant_id"))
@@ -312,3 +300,4 @@ class EmploymentDocument(Base):
         timestamp = Column(DateTime, default=datetime.utcnow)
         
         participant = relationship("Participant")
+        
