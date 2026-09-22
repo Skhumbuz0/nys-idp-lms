@@ -940,6 +940,34 @@ def employment_quiz_view(request: Request, module_code: str):
     if not module: raise HTTPException(404, "Module not found")
     return templates.TemplateResponse(request=request, name="employment_quiz.html", context={"module": module})
 
+@app.get("/fix-employment-db")
+def fix_employment_db(db = Depends(get_db)):
+    """Drops and recreates employment tables to add new columns."""
+    from sqlalchemy import text
+    try:
+        # List of employment tables to recreate
+        tables_to_drop = [
+            "employment_documents",
+            "employment_weekly_reports",
+            "job_applications",
+            "job_opportunities",
+            "employment_experiences",
+            "employment_profiles"
+        ]
+        
+        # Drop them safely
+        for table in tables_to_drop:
+            db.execute(text(f"DROP TABLE IF EXISTS {table} CASCADE"))
+        
+        # Recreate all tables (this builds them with the new columns)
+        Base.metadata.create_all(bind=engine)
+        db.commit()
+        
+        return {"message": "✅ Employment database schema updated successfully! All new columns added."}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+
 # ==========================================
 # MAYO EMPLOYMENT TOOLKIT ROUTES (COMPLETE)
 # ==========================================
