@@ -941,14 +941,19 @@ def employment_quiz_view(request: Request, module_code: str):
 @app.get("/employment/cv-builder", response_class=HTMLResponse)
 def cv_builder(request: Request, db = Depends(get_db)):
     pid = request.query_params.get("pid", "")
+    
+    # Always define these variables so the template doesn't crash
+    profile = None
+    experiences = []
+    
     if pid:
         profile = db.query(EmploymentProfile).filter(EmploymentProfile.participant_id == pid.upper().strip()).first()
         experiences = db.query(EmploymentExperience).filter(EmploymentExperience.participant_id == pid.upper().strip()).all()
-        return templates.TemplateResponse(request=request, name="cv_builder.html", context={
-            "profile": profile,
-            "experiences": experiences
-        })
-    return templates.TemplateResponse(request=request, name="cv_builder.html", context={})
+        
+    return templates.TemplateResponse(request=request, name="cv_builder.html", context={
+        "profile": profile,
+        "experiences": experiences
+    })
 
 @app.post("/employment/cv-builder")
 async def save_cv_profile(request: Request, db = Depends(get_db)):
