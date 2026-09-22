@@ -300,4 +300,3 @@ class EmploymentDocument(Base):
         timestamp = Column(DateTime, default=datetime.utcnow)
         
         participant = relationship("Participant")
-        
