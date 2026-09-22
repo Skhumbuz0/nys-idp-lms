@@ -2,6 +2,12 @@
 import re
 import json
 import os
+from fastapi import UploadFile, File, Form
+from fastapi.responses import FileResponse
+from docx import Document
+from docx.shared import Pt, Inches, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
 from l2l_data import L2L_MODULES
 from l2l_games import (
     LearnerAuditSuite, FluencyIllusionSimulator,
@@ -937,12 +943,13 @@ def employment_quiz_view(request: Request, module_code: str):
 # ==========================================
 # MAYO EMPLOYMENT TOOLKIT ROUTES (COMPLETE)
 # ==========================================
+# Ensure upload directory exists
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.get("/employment/cv-builder", response_class=HTMLResponse)
 def cv_builder(request: Request, db = Depends(get_db)):
     pid = request.query_params.get("pid", "")
-    
-    # Always define these variables so the template doesn't crash
     profile = None
     experiences = []
     
@@ -956,27 +963,70 @@ def cv_builder(request: Request, db = Depends(get_db)):
     })
 
 @app.post("/employment/cv-builder")
-async def save_cv_profile(request: Request, db = Depends(get_db)):
-    form_data = await request.form()
-    pid = str(form_data.get("participant_id", "")).strip().upper()
+async def save_cv_profile(
+    request: Request, 
+    db = Depends(get_db),
+    participant_id: str = Form(...),
+    professional_name: str = Form(...),
+    professional_email: str = Form(...),
+    phone: str = Form(...),
+    city: str = Form(...),
+    province: str = Form(...),
+    id_number: str = Form(""),
+    nationality: str = Form("South African"),
+    gender: str = Form(""),
+    marital_status: str = Form(""),
+    health_status: str = Form("Good"),
+    criminal_record: str = Form("None"),
+    professional_profile: str = Form(""),
+    career_objective: str = Form(""),
+    core_competencies: str = Form(""),
+    certifications: str = Form(""),
+    skills: str = Form(""),
+    references: str = Form(""),
+    experience_text: str = Form(""),
+    photo: UploadFile = File(None)
+):
+    pid = participant_id.strip().upper()
     
     profile = db.query(EmploymentProfile).filter(EmploymentProfile.participant_id == pid).first()
     if not profile:
         profile = EmploymentProfile(participant_id=pid)
         db.add(profile)
     
-    profile.professional_name = form_data.get("professional_name")
-    profile.professional_email = form_data.get("professional_email")
-    profile.phone = form_data.get("phone")
-    profile.city = form_data.get("city")
-    profile.province = form_data.get("province")
-    profile.professional_profile = form_data.get("professional_profile")
-    profile.career_objective = form_data.get("career_objective")
+    # Handle Photo Upload
+    photo_path = profile.photo_path
+    if photo and photo.filename:
+        # Sanitize filename
+        filename = f"{pid}_{photo.filename.replace(' ', '_')}"
+        file_location = f"{UPLOAD_DIR}/{filename}"
+        with open(file_location, "wb") as buffer:
+            buffer.write(await photo.read())
+        photo_path = f"/static/uploads/{filename}"
+    
+    # Update Profile
+    profile.professional_name = professional_name
+    profile.professional_email = professional_email
+    profile.phone = phone
+    profile.city = city
+    profile.province = province
+    profile.photo_path = photo_path
+    profile.id_number = id_number
+    profile.nationality = nationality
+    profile.gender = gender
+    profile.marital_status = marital_status
+    profile.health_status = health_status
+    profile.criminal_record = criminal_record
+    profile.professional_profile = professional_profile
+    profile.career_objective = career_objective
+    profile.core_competencies = core_competencies
+    profile.certifications = certifications
+    profile.skills = skills
+    profile.references = references
     profile.profile_completed = True
     profile.updated_at = datetime.utcnow()
     
-    # Handle experience entries
-    experience_text = form_data.get("experience_text", "")
+    # Save Experience
     if experience_text.strip():
         db.add(EmploymentExperience(
             participant_id=pid,
@@ -989,6 +1039,119 @@ async def save_cv_profile(request: Request, db = Depends(get_db)):
     
     db.commit()
     return RedirectResponse(url=f"/employment/cv-builder?saved=true&pid={pid}", status_code=303)
+
+@app.get("/employment/cv-builder/export")
+def export_cv_docx(request: Request, db = Depends(get_db)):
+    pid = request.query_params.get("pid", "")
+    if not pid:
+        return {"error": "Participant ID required"}
+        
+    profile = db.query(EmploymentProfile).filter(EmploymentProfile.participant_id == pid.upper().strip()).first()
+    experiences = db.query(EmploymentExperience).filter(EmploymentExperience.participant_id == pid.upper().strip()).all()
+    
+    if not profile:
+        return {"error": "Profile not found. Please fill out the CV builder first."}
+
+    # Generate Word Document
+    doc = Document()
+    
+    # 1. Header (Name & Contact)
+    name_para = doc.add_paragraph()
+    name_run = name_para.add_run(profile.professional_name or "Your Name")
+    name_run.font.size = Pt(24)
+    name_run.font.bold = True
+    name_run.font.color.rgb = RGBColor(0, 51, 102) # Dark Blue
+    name_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    contact_para = doc.add_paragraph()
+    contact_run = contact_para.add_run(f"📞 {profile.phone or ''} | 📧 {profile.professional_email or ''} | 📍 {profile.city or ''}, {profile.province or ''}")
+    contact_run.font.size = Pt(11)
+    contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph() # Spacer
+
+    # Helper function for sections
+    def add_section_heading(title):
+        h = doc.add_heading(title, level=2)
+        h.runs[0].font.color.rgb = RGBColor(0, 51, 102)
+        h.runs[0].font.bold = True
+        doc.add_paragraph()
+
+    # 2. Profile
+    if profile.professional_profile:
+        add_section_heading("PROFILE")
+        doc.add_paragraph(profile.professional_profile)
+
+    # 3. Personal Details
+    add_section_heading("PERSONAL DETAILS")
+    details_table = doc.add_table(rows=6, cols=2)
+    details_table.style = 'Normal Table'
+    details_data = [
+        ("ID Number", profile.id_number or "N/A"),
+        ("Nationality", profile.nationality or "South African"),
+        ("Gender", profile.gender or "N/A"),
+        ("Marital Status", profile.marital_status or "N/A"),
+        ("Health Status", profile.health_status or "Good"),
+        ("Criminal Record", profile.criminal_record or "None")
+    ]
+    for i, (label, value) in enumerate(details_data):
+        details_table.rows[i].cells[0].text = label
+        details_table.rows[i].cells[0].paragraphs[0].runs[0].font.bold = True
+        details_table.rows[i].cells[1].text = value
+
+    doc.add_paragraph()
+
+    # 4. Core Competencies
+    if profile.core_competencies:
+        add_section_heading("CORE COMPETENCIES")
+        for item in profile.core_competencies.split('\n'):
+            if item.strip():
+                doc.add_paragraph(item.strip(), style='List Bullet')
+
+    # 5. Certifications
+    if profile.certifications:
+        add_section_heading("CERTIFICATIONS")
+        for item in profile.certifications.split('\n'):
+            if item.strip():
+                doc.add_paragraph(item.strip(), style='List Bullet')
+
+    # 6. Skills
+    if profile.skills:
+        add_section_heading("SKILLS")
+        for item in profile.skills.split('\n'):
+            if item.strip():
+                doc.add_paragraph(item.strip(), style='List Bullet')
+
+    # 7. Education (Simplified for now, can be expanded)
+    add_section_heading("EDUCATION")
+    doc.add_paragraph("National Senior Certificate (Grade 12)", style='List Bullet')
+    doc.add_paragraph("King Makhosonke II Secondary School (2024)", style='List Bullet')
+
+    # 8. Work Experience
+    add_section_heading("WORK EXPERIENCE")
+    for exp in experiences:
+        p = doc.add_paragraph()
+        p.add_run(f"{exp.position or 'Role'}\n").bold = True
+        p.add_run(f"{exp.organisation or 'Organisation'} | {exp.start_date or 'Start'} – {exp.end_date or 'Present'}\n").italic = True
+        
+        # Split description by newlines for bullet points
+        for line in exp.description.split('\n'):
+            if line.strip():
+                doc.add_paragraph(line.strip(), style='List Bullet')
+        doc.add_paragraph()
+
+    # 9. References
+    if profile.references:
+        add_section_heading("REFERENCES")
+        for ref in profile.references.split('\n'):
+            if ref.strip():
+                doc.add_paragraph(ref.strip())
+
+    # Save to temporary file
+    filename = f"{profile.professional_name.replace(' ', '_')}_CV.docx"
+    filepath = f"{UPLOAD_DIR}/{filename}"
+    doc.save(filepath)
+    
+    return FileResponse(filepath, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename=filename)
 
 @app.get("/employment/job-analyser", response_class=HTMLResponse)
 def job_analyser(request: Request, db = Depends(get_db)):

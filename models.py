@@ -167,19 +167,39 @@ class EmploymentProfile(Base):
     __tablename__ = "employment_profiles"
     id = Column(Integer, primary_key=True, index=True)
     participant_id = Column(String, ForeignKey("participants.participant_id"), unique=True)
+    
+    # Contact & Photo
     professional_name = Column(String, nullable=True)
     professional_email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     city = Column(String, nullable=True)
     province = Column(String, nullable=True)
+    photo_path = Column(String, nullable=True)
+    
+    # Personal Details
+    id_number = Column(String, nullable=True)
+    nationality = Column(String, default="South African")
+    gender = Column(String, nullable=True)
+    marital_status = Column(String, nullable=True)
+    health_status = Column(String, default="Good")
+    criminal_record = Column(String, default="None")
+    
+    # Profile & Career
     professional_profile = Column(String, nullable=True)
     career_objective = Column(String, nullable=True)
+    
+    # Lists (stored as newline-separated text or JSON)
+    core_competencies = Column(String, nullable=True)
+    certifications = Column(String, nullable=True)
+    skills = Column(String, nullable=True)
+    references = Column(String, nullable=True) # Format: "Name - Title, Org | Phone | Email"
+    
     profile_completed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     participant = relationship("Participant")
-
+    
 class EmploymentExperience(Base):
     __tablename__ = "employment_experiences"
     id = Column(Integer, primary_key=True, index=True)
