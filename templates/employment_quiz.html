@@ -39,20 +39,24 @@
             <input type="hidden" name="participant_id" id="pid-input">
             
             {% for q in module.quiz %}
-            <div class="bg-gray-50 p-5 rounded-lg border-l-4 border-blue-400">
-                <p class="font-bold text-gray-900 mb-3">
-                    <span class="text-blue-600">Q{{ loop.index }}.</span> {{ q.q }}
-                </p>
-                <div class="space-y-2">
-                    {% for opt in q.options %}
-                    <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-white rounded transition">
-                        <input type="radio" name="q_{{ loop.index0 }}" value="{{ loop.index0 }}" required 
-                               class="text-blue-600 focus:ring-blue-500 h-4 w-4">
-                        <span class="text-gray-700">{{ opt }}</span>
-                    </label>
-                    {% endfor %}
+                <!-- FIX: Save the question index before the inner loop overwrites 'loop' -->
+                {% set q_idx = loop.index0 %}
+                
+                <div class="bg-gray-50 p-5 rounded-lg border-l-4 border-blue-400">
+                    <p class="font-bold text-gray-900 mb-3">
+                        <span class="text-blue-600">Q{{ loop.index }}.</span> {{ q.q }}
+                    </p>
+                    <div class="space-y-2">
+                        {% for opt in q.options %}
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-white rounded transition">
+                            <!-- FIX: Use q_idx for the name, and loop.index0 for the value -->
+                            <input type="radio" name="q_{{ q_idx }}" value="{{ loop.index0 }}" required 
+                                   class="text-blue-600 focus:ring-blue-500 h-4 w-4">
+                            <span class="text-gray-700">{{ opt }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
                 </div>
-            </div>
             {% endfor %}
 
             <div class="flex flex-col sm:flex-row gap-3 pt-4">
