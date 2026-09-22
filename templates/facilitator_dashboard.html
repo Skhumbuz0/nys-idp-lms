@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="max-w-7xl mx-auto">
-    <!-- Header -->
     <div class="mb-6">
         <h1 class="text-3xl font-bold text-gray-900">📊 Facilitator Command Centre</h1>
         <p class="text-gray-600 mt-1">Monitor participant progress across all MAYO courses</p>
@@ -9,44 +8,21 @@
 
     <!-- Tab Navigation -->
     <div class="flex flex-wrap gap-2 mb-6 border-b border-gray-200">
-        <button onclick="switchTab('overview')" data-tab="overview" class="tab-btn px-4 py-2 font-semibold text-blue-600 border-b-2 border-blue-600">
-            📈 Overview
-        </button>
-        <button onclick="switchTab('idp')" data-tab="idp" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">
-            📘 NYS IDP (30-Day)
-        </button>
-        <button onclick="switchTab('nemisa')" data-tab="nemisa" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">
-            💻 NEMISA Digital
-        </button>
-        <button onclick="switchTab('ai')" data-tab="ai" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">
-            🤖 AI Fluency
-        </button>
-        <button onclick="switchTab('l2l')" data-tab="l2l" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">
-            🧠 Learning to Learn
-        </button>
-        <button onclick="switchTab('employment')" data-tab="employment" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">
-            💼 Employment Readiness
-        </button>
+        <button onclick="switchTab('overview')" data-tab="overview" class="tab-btn px-4 py-2 font-semibold text-blue-600 border-b-2 border-blue-600">📈 Overview</button>
+        <button onclick="switchTab('idp')" data-tab="idp" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">📘 NYS IDP (30-Day)</button>
+        <button onclick="switchTab('nemisa')" data-tab="nemisa" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">💻 NEMISA Digital</button>
+        <button onclick="switchTab('ai')" data-tab="ai" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">🤖 AI Fluency</button>
+        <button onclick="switchTab('l2l')" data-tab="l2l" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">🧠 Learning to Learn</button>
+        <button onclick="switchTab('employment')" data-tab="employment" class="tab-btn px-4 py-2 font-semibold text-gray-500 hover:text-blue-600 border-b-2 border-transparent">💼 Employment Readiness</button>
     </div>
 
-    <!-- Tab Content Containers -->
+    <!-- Tab Content -->
     <div id="tab-overview" class="tab-content"></div>
-    <div id="tab-idp" class="tab-content hidden">
-        <!-- Existing NYS IDP content will be loaded here -->
-        <div id="idp-content">Loading NYS IDP data...</div>
-    </div>
-    <div id="tab-nemisa" class="tab-content hidden">
-        <div id="nemisa-content">Loading NEMISA data...</div>
-    </div>
-    <div id="tab-ai" class="tab-content hidden">
-        <div id="ai-content">Loading AI Fluency data...</div>
-    </div>
-    <div id="tab-l2l" class="tab-content hidden">
-        <div id="l2l-content">Loading Learning to Learn data...</div>
-    </div>
-    <div id="tab-employment" class="tab-content hidden">
-        <div id="employment-content">Loading Employment data...</div>
-    </div>
+    <div id="tab-idp" class="tab-content hidden"><div id="idp-content">Loading...</div></div>
+    <div id="tab-nemisa" class="tab-content hidden"><div id="nemisa-content">Loading...</div></div>
+    <div id="tab-ai" class="tab-content hidden"><div id="ai-content">Loading...</div></div>
+    <div id="tab-l2l" class="tab-content hidden"><div id="l2l-content">Loading...</div></div>
+    <div id="tab-employment" class="tab-content hidden"><div id="employment-content">Loading...</div></div>
 </div>
 
 <script>
@@ -54,26 +30,17 @@ let currentTab = 'overview';
 const loadedTabs = {};
 
 function switchTab(tabName) {
-    // Hide all tabs
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('text-blue-600', 'border-blue-600');
         btn.classList.add('text-gray-500', 'border-transparent');
     });
-    
-    // Show selected tab
     document.getElementById(`tab-${tabName}`).classList.remove('hidden');
     const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
     activeBtn.classList.remove('text-gray-500', 'border-transparent');
     activeBtn.classList.add('text-blue-600', 'border-blue-600');
-    
     currentTab = tabName;
-    
-    // Load data if not already loaded
-    if (!loadedTabs[tabName]) {
-        loadTabData(tabName);
-        loadedTabs[tabName] = true;
-    }
+    if (!loadedTabs[tabName]) { loadTabData(tabName); loadedTabs[tabName] = true; }
 }
 
 async function loadTabData(tabName) {
@@ -85,362 +52,208 @@ async function loadTabData(tabName) {
         'l2l': '/api/facilitator/l2l',
         'employment': '/api/facilitator/employment'
     };
-    
     try {
         const response = await fetch(endpoints[tabName]);
         const data = await response.json();
         renderTabContent(tabName, data);
     } catch (err) {
-        console.error(`Error loading ${tabName}:`, err);
-        document.getElementById(`${tabName}-content`).innerHTML = 
-            '<p class="text-red-600 p-4">Error loading data. Please refresh the page.</p>';
+        document.getElementById(`${tabName}-content`).innerHTML = '<p class="text-red-600 p-4">Error loading data.</p>';
     }
 }
 
 function renderTabContent(tabName, data) {
     const container = document.getElementById(`${tabName}-content`);
-    
     if (tabName === 'overview') {
-        container.innerHTML = renderOverview(data);
+        container.innerHTML = `
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500">
+                    <p class="text-sm text-gray-500 font-bold">Total Participants</p>
+                    <p class="text-3xl font-bold text-gray-900">${data.total_participants || 0}</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500">
+                    <p class="text-sm text-gray-500 font-bold">NYS IDP Completion</p>
+                    <p class="text-3xl font-bold text-gray-900">${data.idp_completion || 0}%</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500">
+                    <p class="text-sm text-gray-500 font-bold">Employment CVs Built</p>
+                    <p class="text-3xl font-bold text-gray-900">${data.cvs_built || 0}</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500">
+                    <p class="text-sm text-gray-500 font-bold">Active Courses</p>
+                    <p class="text-3xl font-bold text-gray-900">5</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow">
+                <h3 class="text-xl font-bold mb-4">Welcome to the Facilitator Dashboard</h3>
+                <p class="text-gray-700">Click on the tabs above to view detailed, participant-by-participant progress for each specific course. The Overview tab provides high-level statistics across the entire MAYO programme.</p>
+            </div>`;
     } else if (tabName === 'idp') {
-        container.innerHTML = renderIDP(data);
-    } else if (tabName === 'nemisa') {
-        container.innerHTML = renderNemisa(data);
-    } else if (tabName === 'ai') {
-        container.innerHTML = renderAI(data);
-    } else if (tabName === 'l2l') {
-        container.innerHTML = renderL2L(data);
-    } else if (tabName === 'employment') {
-        container.innerHTML = renderEmployment(data);
-    }
-}
-
-// ==========================================
-// RENDER FUNCTIONS FOR EACH TAB
-// ==========================================
-
-function renderOverview(data) {
-    return `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500">
-                <p class="text-sm text-gray-500 font-bold">Total Participants</p>
-                <p class="text-3xl font-bold text-gray-900">${data.total_participants || 0}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500">
-                <p class="text-sm text-gray-500 font-bold">Active Courses</p>
-                <p class="text-3xl font-bold text-gray-900">5</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500">
-                <p class="text-sm text-gray-500 font-bold">NYS IDP Completion</p>
-                <p class="text-3xl font-bold text-gray-900">${data.idp_completion || 0}%</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500">
-                <p class="text-sm text-gray-500 font-bold">Employment CVs Built</p>
-                <p class="text-3xl font-bold text-gray-900">${data.cvs_built || 0}</p>
-            </div>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-xl font-bold mb-4">Quick Summary</h3>
-            <p class="text-gray-700">Click on the tabs above to view detailed progress for each course. Use the Overview tab to see high-level statistics across all programmes.</p>
-        </div>
-    `;
-}
-
-function renderIDP(data) {
-    // This will be populated by the existing facilitator IDP logic
-    // For now, show a placeholder that loads the existing view
-    return `
-        <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-xl font-bold mb-4">📘 NYS IDP: 30-Day Challenge Progress</h3>
-            <p class="text-gray-600 mb-4">Participants: ${data.total_participants || 0}</p>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="p-3 text-left">Participant</th>
-                            <th class="p-3 text-left">Email</th>
-                            <th class="p-3 text-center">Progress</th>
-                            <th class="p-3 text-center">Risk Status</th>
-                            <th class="p-3 text-center">Last Activity</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${(data.participants || []).map(p => `
-                            <tr class="border-t hover:bg-gray-50">
-                                <td class="p-3 font-semibold">${p.name}</td>
-                                <td class="p-3 text-gray-600">${p.email}</td>
-                                <td class="p-3 text-center">
-                                    <div class="w-full bg-gray-200 rounded-full h-2">
-                                        <div class="bg-purple-600 h-2 rounded-full" style="width: ${p.progress_pct || 0}%"></div>
-                                    </div>
-                                    <span class="text-xs">${p.progress_pct || 0}%</span>
-                                </td>
-                                <td class="p-3 text-center">
-                                    <span class="px-2 py-1 rounded text-xs font-bold ${getRiskColor(p.risk_status)}">${p.risk_status || 'N/A'}</span>
-                                </td>
-                                <td class="p-3 text-center text-xs">${p.last_activity ? new Date(p.last_activity).toLocaleDateString() : 'N/A'}</td>
+        container.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow">
+                <h3 class="text-xl font-bold mb-4">📘 NYS IDP: 30-Day Challenge Progress</h3>
+                <p class="text-gray-600 mb-4">Total Participants: ${data.total_participants || 0}</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-3 text-left">Participant</th>
+                                <th class="p-3 text-left">Email</th>
+                                <th class="p-3 text-center">Progress</th>
+                                <th class="p-3 text-center">W1</th>
+                                <th class="p-3 text-center">W2</th>
+                                <th class="p-3 text-center">W3</th>
+                                <th class="p-3 text-center">W4</th>
+                                <th class="p-3 text-center">Risk Status</th>
+                                <th class="p-3 text-center">Last Activity</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-}
-
-function renderNemisa(data) {
-    return `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500">
-                <p class="text-sm text-gray-500 font-bold">Participants</p>
-                <p class="text-3xl font-bold">${data.stats.total_participants}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500">
-                <p class="text-sm text-gray-500 font-bold">Total Assignments</p>
-                <p class="text-3xl font-bold">${data.stats.total_assignments}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500">
-                <p class="text-sm text-gray-500 font-bold">Completed</p>
-                <p class="text-3xl font-bold">${data.stats.completed}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500">
-                <p class="text-sm text-gray-500 font-bold">Completion Rate</p>
-                <p class="text-3xl font-bold">${data.stats.completion_rate}%</p>
-            </div>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-xl font-bold mb-4">💻 NEMISA Digital Skills Progress</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="p-3 text-left">Participant</th>
-                            <th class="p-3 text-left">Courses Enrolled</th>
-                            <th class="p-3 text-center">Avg Progress</th>
-                            <th class="p-3 text-center">Exams Passed</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.participants.map(p => {
-                            const avgProgress = p.courses.length > 0 
-                                ? Math.round(p.courses.reduce((sum, c) => sum + c.progress, 0) / p.courses.length) 
-                                : 0;
-                            const examsPassed = p.courses.filter(c => c.exam_passed).length;
-                            return `
+                        </thead>
+                        <tbody>
+                            ${(data.participants || []).map(p => `
                                 <tr class="border-t hover:bg-gray-50">
-                                    <td class="p-3">
-                                        <div class="font-semibold">${p.name}</div>
-                                        <div class="text-xs text-gray-500">${p.email}</div>
-                                    </td>
-                                    <td class="p-3">
-                                        <div class="text-xs">${p.courses.length} courses</div>
-                                        <div class="text-xs text-gray-500">${p.courses.map(c => c.course_name).join(', ')}</div>
-                                    </td>
+                                    <td class="p-3 font-semibold">${p.name}</td>
+                                    <td class="p-3 text-gray-600 text-xs">${p.email}</td>
                                     <td class="p-3 text-center">
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-green-600 h-2 rounded-full" style="width: ${avgProgress}%"></div>
-                                        </div>
-                                        <span class="text-xs">${avgProgress}%</span>
+                                        <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-purple-600 h-2 rounded-full" style="width: ${p.progress_pct}%"></div></div>
+                                        <span class="text-xs">${p.progress_pct}%</span>
                                     </td>
-                                    <td class="p-3 text-center font-bold text-green-700">${examsPassed}/${p.courses.length}</td>
+                                    <td class="p-3 text-center">${p.week1 ? '✅' : '⬜'}</td>
+                                    <td class="p-3 text-center">${p.week2 ? '✅' : '⬜'}</td>
+                                    <td class="p-3 text-center">${p.week3 ? '✅' : '⬜'}</td>
+                                    <td class="p-3 text-center">${p.week4 ? '✅' : '⬜'}</td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-bold ${getRiskColor(p.risk_status)}">${p.risk_status}</span></td>
+                                    <td class="p-3 text-center text-xs">${p.last_activity}</td>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    } else if (tabName === 'nemisa') {
+        container.innerHTML = `
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500"><p class="text-sm text-gray-500 font-bold">Participants</p><p class="text-3xl font-bold">${data.stats.total_participants}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500"><p class="text-sm text-gray-500 font-bold">Total Assignments</p><p class="text-3xl font-bold">${data.stats.total_assignments}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500"><p class="text-sm text-gray-500 font-bold">Completed</p><p class="text-3xl font-bold">${data.stats.completed}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500"><p class="text-sm text-gray-500 font-bold">Completion Rate</p><p class="text-3xl font-bold">${data.stats.completion_rate}%</p></div>
             </div>
-        </div>
-    `;
-}
-
-function renderAI(data) {
-    return `
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-indigo-500">
-                <p class="text-sm text-gray-500 font-bold">Participants</p>
-                <p class="text-3xl font-bold">${data.stats.total_participants}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500">
-                <p class="text-sm text-gray-500 font-bold">Evidence Submissions</p>
-                <p class="text-3xl font-bold">${data.stats.total_evidence_submissions}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500">
-                <p class="text-sm text-gray-500 font-bold">Total Modules</p>
-                <p class="text-3xl font-bold">9</p>
-            </div>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-xl font-bold mb-4">🤖 MAYO AI Fluency Progress</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="p-3 text-left">Participant</th>
-                            <th class="p-3 text-center">Modules Completed</th>
-                            <th class="p-3 text-center">Evidence Submitted</th>
-                            <th class="p-3 text-center">Progress</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.participants.map(p => {
-                            const pct = Math.round((p.modules_completed / p.modules_total) * 100);
-                            return `
+            <div class="bg-white p-6 rounded-xl shadow">
+                <h3 class="text-xl font-bold mb-4">💻 NEMISA Digital Skills Progress</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-left">Courses</th><th class="p-3 text-center">Avg Progress</th></tr></thead>
+                        <tbody>
+                            ${data.participants.map(p => `
                                 <tr class="border-t hover:bg-gray-50">
-                                    <td class="p-3">
-                                        <div class="font-semibold">${p.name}</div>
-                                        <div class="text-xs text-gray-500">${p.email}</div>
+                                    <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
+                                    <td class="p-3 text-xs">${p.courses.length > 0 ? p.courses.map(c => c.course_name).join(', ') : 'Not started'}</td>
+                                    <td class="p-3 text-center">
+                                        <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-green-600 h-2 rounded-full" style="width: ${p.avg_progress}%"></div></div>
+                                        <span class="text-xs">${p.avg_progress}%</span>
                                     </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    } else if (tabName === 'ai') {
+        container.innerHTML = `
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-indigo-500"><p class="text-sm text-gray-500 font-bold">Participants</p><p class="text-3xl font-bold">${data.stats.total_participants}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500"><p class="text-sm text-gray-500 font-bold">Evidence Submissions</p><p class="text-3xl font-bold">${data.stats.total_evidence_submissions}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500"><p class="text-sm text-gray-500 font-bold">Total Modules</p><p class="text-3xl font-bold">9</p></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow">
+                <h3 class="text-xl font-bold mb-4">🤖 MAYO AI Fluency Progress</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules</th><th class="p-3 text-center">Evidence</th><th class="p-3 text-center">Progress</th></tr></thead>
+                        <tbody>
+                            ${data.participants.map(p => `
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
                                     <td class="p-3 text-center">${p.modules_completed} / ${p.modules_total}</td>
                                     <td class="p-3 text-center font-bold text-indigo-700">${p.evidence_count}</td>
                                     <td class="p-3 text-center">
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-indigo-600 h-2 rounded-full" style="width: ${pct}%"></div>
-                                        </div>
-                                        <span class="text-xs">${pct}%</span>
+                                        <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-indigo-600 h-2 rounded-full" style="width: ${p.progress_pct}%"></div></div>
+                                        <span class="text-xs">${p.progress_pct}%</span>
                                     </td>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    } else if (tabName === 'l2l') {
+        container.innerHTML = `
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500"><p class="text-sm text-gray-500 font-bold">Participants</p><p class="text-3xl font-bold">${data.stats.total_participants}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-yellow-500"><p class="text-sm text-gray-500 font-bold">Avg Quiz Score</p><p class="text-3xl font-bold">${data.stats.avg_score_across_all}%</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-red-500"><p class="text-sm text-gray-500 font-bold">Total Modules</p><p class="text-3xl font-bold">8</p></div>
             </div>
-        </div>
-    `;
-}
-
-function renderL2L(data) {
-    return `
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500">
-                <p class="text-sm text-gray-500 font-bold">Participants</p>
-                <p class="text-3xl font-bold">${data.stats.total_participants}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-yellow-500">
-                <p class="text-sm text-gray-500 font-bold">Avg Quiz Score</p>
-                <p class="text-3xl font-bold">${data.stats.avg_score_across_all}%</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-red-500">
-                <p class="text-sm text-gray-500 font-bold">Total Modules</p>
-                <p class="text-3xl font-bold">8</p>
-            </div>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-xl font-bold mb-4">🧠 MAYO Learning to Learn Progress</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="p-3 text-left">Participant</th>
-                            <th class="p-3 text-center">Modules Passed</th>
-                            <th class="p-3 text-center">Avg Quiz Score</th>
-                            <th class="p-3 text-center">Progress</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.participants.map(p => {
-                            const pct = Math.round((p.modules_passed / p.modules_total) * 100);
-                            return `
+            <div class="bg-white p-6 rounded-xl shadow">
+                <h3 class="text-xl font-bold mb-4">🧠 MAYO Learning to Learn Progress</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules Passed</th><th class="p-3 text-center">Avg Score</th><th class="p-3 text-center">Progress</th></tr></thead>
+                        <tbody>
+                            ${data.participants.map(p => `
                                 <tr class="border-t hover:bg-gray-50">
-                                    <td class="p-3">
-                                        <div class="font-semibold">${p.name}</div>
-                                        <div class="text-xs text-gray-500">${p.email}</div>
-                                    </td>
+                                    <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
                                     <td class="p-3 text-center">${p.modules_passed} / ${p.modules_total}</td>
                                     <td class="p-3 text-center font-bold text-orange-700">${p.average_pct}%</td>
                                     <td class="p-3 text-center">
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-orange-600 h-2 rounded-full" style="width: ${pct}%"></div>
-                                        </div>
-                                        <span class="text-xs">${pct}%</span>
+                                        <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-orange-600 h-2 rounded-full" style="width: ${p.progress_pct}%"></div></div>
+                                        <span class="text-xs">${p.progress_pct}%</span>
                                     </td>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    } else if (tabName === 'employment') {
+        container.innerHTML = `
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500"><p class="text-sm text-gray-500 font-bold">Participants</p><p class="text-3xl font-bold">${data.stats.total_participants}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500"><p class="text-sm text-gray-500 font-bold">CVs Built</p><p class="text-3xl font-bold">${data.stats.cvs_built}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500"><p class="text-sm text-gray-500 font-bold">Total Applications</p><p class="text-3xl font-bold">${data.stats.total_applications}</p></div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500"><p class="text-sm text-gray-500 font-bold">Weekly Reports</p><p class="text-3xl font-bold">${data.stats.total_weekly_reports}</p></div>
             </div>
-        </div>
-    `;
-}
-
-function renderEmployment(data) {
-    return `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500">
-                <p class="text-sm text-gray-500 font-bold">Participants</p>
-                <p class="text-3xl font-bold">${data.stats.total_participants}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500">
-                <p class="text-sm text-gray-500 font-bold">CVs Built</p>
-                <p class="text-3xl font-bold">${data.stats.cvs_built}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500">
-                <p class="text-sm text-gray-500 font-bold">Total Applications</p>
-                <p class="text-3xl font-bold">${data.stats.total_applications}</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-orange-500">
-                <p class="text-sm text-gray-500 font-bold">Weekly Reports</p>
-                <p class="text-3xl font-bold">${data.stats.total_weekly_reports}</p>
-            </div>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-xl font-bold mb-4">💼 MAYO Employment Readiness Progress</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="p-3 text-left">Participant</th>
-                            <th class="p-3 text-center">Modules Passed</th>
-                            <th class="p-3 text-center">CV Built</th>
-                            <th class="p-3 text-center">Applications</th>
-                            <th class="p-3 text-center">Weekly Reports</th>
-                            <th class="p-3 text-center">Progress</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.participants.map(p => {
-                            const pct = Math.round((p.modules_passed / p.modules_total) * 100);
-                            return `
+            <div class="bg-white p-6 rounded-xl shadow">
+                <h3 class="text-xl font-bold mb-4">💼 MAYO Employment Readiness Progress</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules</th><th class="p-3 text-center">CV Built</th><th class="p-3 text-center">Apps</th><th class="p-3 text-center">Reports</th><th class="p-3 text-center">Progress</th></tr></thead>
+                        <tbody>
+                            ${data.participants.map(p => `
                                 <tr class="border-t hover:bg-gray-50">
-                                    <td class="p-3">
-                                        <div class="font-semibold">${p.name}</div>
-                                        <div class="text-xs text-gray-500">${p.email}</div>
-                                    </td>
+                                    <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
                                     <td class="p-3 text-center">${p.modules_passed} / ${p.modules_total}</td>
-                                    <td class="p-3 text-center">
-                                        ${p.cv_built 
-                                            ? '<span class="text-green-600 font-bold">✅ Yes</span>' 
-                                            : '<span class="text-gray-400">❌ No</span>'}
-                                    </td>
+                                    <td class="p-3 text-center">${p.cv_built ? '<span class="text-green-600 font-bold">✅</span>' : '<span class="text-gray-400">❌</span>'}</td>
                                     <td class="p-3 text-center font-bold text-blue-700">${p.applications_count}</td>
                                     <td class="p-3 text-center font-bold text-orange-700">${p.weekly_reports}</td>
                                     <td class="p-3 text-center">
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${pct}%"></div>
-                                        </div>
-                                        <span class="text-xs">${pct}%</span>
+                                        <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-blue-600 h-2 rounded-full" style="width: ${p.progress_pct}%"></div></div>
+                                        <span class="text-xs">${p.progress_pct}%</span>
                                     </td>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    }
 }
 
 function getRiskColor(status) {
-    if (!status) return 'bg-gray-100 text-gray-600';
+    if (!status || status === 'Not Started') return 'bg-gray-100 text-gray-600';
     if (status.includes('High') || status.includes('At Risk')) return 'bg-red-100 text-red-800';
     if (status.includes('Medium')) return 'bg-yellow-100 text-yellow-800';
-    if (status.includes('Low') || status.includes('Good')) return 'bg-green-100 text-green-800';
-    return 'bg-gray-100 text-gray-600';
+    return 'bg-green-100 text-green-800';
 }
 
-// ==========================================
-// INITIALIZE - Load Overview on page load
-// ==========================================
+// Initialize
 loadTabData('overview');
 </script>
 {% endblock %}

@@ -1428,217 +1428,20 @@ async def submit_employment_quiz(module_code: str, request: Request, db = Depend
     # === END NEW ===
     
     return RedirectResponse(url=f"/employment/module/{module_code}/quiz?result={'pass' if passed else 'fail'}&score={score}/{max_score}", status_code=303)
-
 # ==========================================
 # FACILITATOR MULTI-COURSE PROGRESS APIs
 # ==========================================
 
-@app.get("/api/facilitator/nemisa")
-def facilitator_nemisa_data(db = Depends(get_db)):
-    """NEMISA Digital Skills progress for all participants."""
-    assignments = db.query(NemisaAssignment).join(Participant).all()
-    
-    # Group by participant
-    participant_data = {}
-    for a in assignments:
-        pid = a.participant_id
-        if pid not in participant_data:
-            p = db.query(Participant).filter(Participant.participant_id == pid).first()
-            participant_data[pid] = {
-                "participant_id": pid,
-                "name": p.full_name if p else "Unknown",
-                "email": p.email if p else "",
-                "courses": []
-            }
-        course = db.query(NemisaCourse).filter(NemisaCourse.code == a.course_code).first()
-        participant_data[pid]["courses"].append({
-            "course_name": course.name if course else a.course_code,
-            "progress": a.progress_pct or 0,
-            "status": a.status or "NOT STARTED",
-            "exam_passed": a.exam_passed
-        })
-    
-    # Calculate overall stats
-    total_assignments = len(assignments)
-    completed = sum(1 for a in assignments if a.status == "COMPLETED")
-    exams_passed = sum(1 for a in assignments if a.exam_passed)
-    
-    return {
-        "participants": list(participant_data.values()),
-        "stats": {
-            "total_participants": len(participant_data),
-            "total_assignments": total_assignments,
-            "completed": completed,
-            "exams_passed": exams_passed,
-            "completion_rate": round((completed / total_assignments * 100), 1) if total_assignments > 0 else 0
-        }
-    }
-
-@app.get("/api/facilitator/ai-fluency")
-def facilitator_ai_data(db = Depends(get_db)):
-    """MAYO AI Fluency Programme progress for all participants."""
-    records = db.query(AIFluencyProgress).join(Participant).all()
-    
-    # Group by participant
-    participant_data = {}
-    for r in records:
-        pid = r.participant_id
-        if pid not in participant_data:
-            p = db.query(Participant).filter(Participant.participant_id == pid).first()
-            participant_data[pid] = {
-                "participant_id": pid,
-                "name": p.full_name if p else "Unknown",
-                "email": p.email if p else "",
-                "modules_completed": 0,
-                "modules_total": 0,
-                "evidence_count": 0,
-                "last_activity": r.timestamp.isoformat() if r.timestamp else None
-            }
-        if r.completed:
-            participant_data[pid]["modules_completed"] += 1
-        if r.evidence:
-            participant_data[pid]["evidence_count"] += 1
-    
-    # Total modules = 4 core + 5 elective = 9
-    for pid in participant_data:
-        participant_data[pid]["modules_total"] = 9
-    
-    return {
-        "participants": list(participant_data.values()),
-        "stats": {
-            "total_participants": len(participant_data),
-            "total_evidence_submissions": sum(p["evidence_count"] for p in participant_data.values())
-        }
-    }
-
-@app.get("/api/facilitator/l2l")
-def facilitator_l2l_data(db = Depends(get_db)):
-    """MAYO Learning to Learn progress for all participants."""
-    records = db.query(L2LProgress).join(Participant).all()
-    
-    participant_data = {}
-    for r in records:
-        pid = r.participant_id
-        if pid not in participant_data:
-            p = db.query(Participant).filter(Participant.participant_id == pid).first()
-            participant_data[pid] = {
-                "participant_id": pid,
-                "name": p.full_name if p else "Unknown",
-                "email": p.email if p else "",
-                "modules_passed": 0,
-                "modules_total": 8,
-                "total_score": 0,
-                "total_max": 0,
-                "average_pct": 0
-            }
-        if r.completed:
-            participant_data[pid]["modules_passed"] += 1
-        participant_data[pid]["total_score"] += r.quiz_score or 0
-        participant_data[pid]["total_max"] += r.quiz_max or 0
-    
-    for pid in participant_data:
-        p = participant_data[pid]
-        p["average_pct"] = round((p["total_score"] / p["total_max"] * 100), 1) if p["total_max"] > 0 else 0
-    
-    return {
-        "participants": list(participant_data.values()),
-        "stats": {
-            "total_participants": len(participant_data),
-            "avg_score_across_all": round(
-                sum(p["average_pct"] for p in participant_data.values()) / len(participant_data), 1
-            ) if participant_data else 0
-        }
-    }
-
-@app.get("/api/facilitator/employment")
-def facilitator_employment_data(db = Depends(get_db)):
-    """MAYO Employment Readiness progress + toolkit usage."""
-    # Quiz progress
-    quiz_records = db.query(EmploymentProgress).join(Participant).all()
-    
-    participant_data = {}
-    for r in quiz_records:
-        pid = r.participant_id
-        if pid not in participant_data:
-            p = db.query(Participant).filter(Participant.participant_id == pid).first()
-            participant_data[pid] = {
-                "participant_id": pid,
-                "name": p.full_name if p else "Unknown",
-                "email": p.email if p else "",
-                "modules_passed": 0,
-                "modules_total": 14,
-                "total_score": 0,
-                "total_max": 0,
-                "average_pct": 0,
-                "cv_built": False,
-                "applications_count": 0,
-                "weekly_reports": 0
-            }
-        if r.completed:
-            participant_data[pid]["modules_passed"] += 1
-        participant_data[pid]["total_score"] += r.quiz_score or 0
-        participant_data[pid]["total_max"] += r.quiz_max or 0
-    
-    # Enrich with toolkit usage data
-    for pid in participant_data:
-        # Check if CV is built
-        profile = db.query(EmploymentProfile).filter(
-            EmploymentProfile.participant_id == pid,
-            EmploymentProfile.profile_completed == True
-        ).first()
-        participant_data[pid]["cv_built"] = profile is not None
-        
-        # Count applications
-        apps = db.query(JobApplication).filter(JobApplication.participant_id == pid).count()
-        participant_data[pid]["applications_count"] = apps
-        
-        # Count weekly reports
-        reports = db.query(EmploymentWeeklyReport).filter(
-            EmploymentWeeklyReport.participant_id == pid,
-            EmploymentWeeklyReport.submitted == True
-        ).count()
-        participant_data[pid]["weekly_reports"] = reports
-    
-    # Calculate averages
-    for pid in participant_data:
-        p = participant_data[pid]
-        p["average_pct"] = round((p["total_score"] / p["total_max"] * 100), 1) if p["total_max"] > 0 else 0
-    
-    return {
-        "participants": list(participant_data.values()),
-        "stats": {
-            "total_participants": len(participant_data),
-            "cvs_built": sum(1 for p in participant_data.values() if p["cv_built"]),
-            "total_applications": sum(p["applications_count"] for p in participant_data.values()),
-            "total_weekly_reports": sum(p["weekly_reports"] for p in participant_data.values())
-        }
-    }
-
-# ==========================================
-# FACILITATOR & INIT ROUTES
-# ==========================================
-@app.get("/facilitator", response_class=HTMLResponse)
-def facilitator_dashboard(request: Request, db = Depends(get_db)):
-    total = db.query(Participant).count()
-    completed = db.query(Participant).filter(Participant.final_idp_complete == True).count()
-    risk_counts = db.query(Participant.risk_status, func.count(Participant.id)).group_by(Participant.risk_status).all()
-    risk_dict = {status: count for status, count in risk_counts}
-    participants = db.query(Participant).all()
-    priority = {"At Risk": 1, "Needs Attention": 2, "Not Started": 3, "On Track": 4, "Completed": 5}
-    participants.sort(key=lambda x: priority.get(x.risk_status, 6))
-    return templates.TemplateResponse(request=request, name="facilitator_dashboard.html", context={"total": total, "completed": completed, "risk_dict": risk_dict, "participants": participants})
-
 @app.get("/api/facilitator/overview")
 def facilitator_overview(db = Depends(get_db)):
-    """High-level stats across all courses."""
     total_participants = db.query(Participant).count()
     
-    # NYS IDP stats
+    # NYS IDP stats (fallback to all participants if no specific enrollments)
     idp_enrollments = db.query(Enrollment).filter(Enrollment.course_code == "NYS-IDP").all()
-    idp_completed = sum(1 for e in idp_enrollments if e.progress_pct >= 100)
-    idp_completion = round((idp_completed / len(idp_enrollments) * 100), 1) if idp_enrollments else 0
+    idp_count = len(idp_enrollments) if idp_enrollments else total_participants
+    idp_completed = sum(1 for e in idp_enrollments if e.progress_pct >= 100) if idp_enrollments else sum(1 for p in db.query(Participant).all() if p.final_idp_complete)
+    idp_completion = round((idp_completed / idp_count * 100), 1) if idp_count > 0 else 0
     
-    # Employment CVs
     cvs_built = db.query(EmploymentProfile).filter(EmploymentProfile.profile_completed == True).count()
     
     return {
@@ -1647,6 +1450,194 @@ def facilitator_overview(db = Depends(get_db)):
         "cvs_built": cvs_built
     }
 
+@app.get("/api/facilitator/idp")
+def facilitator_idp_data(db = Depends(get_db)):
+    """Original NYS IDP 30-Day Challenge view for ALL participants."""
+    participants = db.query(Participant).all()
+    participant_data = []
+    
+    for p in participants:
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.participant_id == p.participant_id,
+            Enrollment.course_code == "NYS-IDP"
+        ).first()
+        progress = round(enrollment.progress_pct, 1) if enrollment else round(p.overall_progress_pct, 1)
+        
+        participant_data.append({
+            "participant_id": p.participant_id,
+            "name": p.full_name,
+            "email": p.email,
+            "progress_pct": progress,
+            "risk_status": p.risk_status or "Not Started",
+            "last_activity": p.last_activity.strftime("%Y-%m-%d") if p.last_activity else "Never",
+            "week1": p.week1_complete,
+            "week2": p.week2_complete,
+            "week3": p.week3_complete,
+            "week4": p.week4_complete
+        })
+    
+    return {"participants": participant_data, "total_participants": len(participant_data)}
+
+@app.get("/api/facilitator/nemisa")
+def facilitator_nemisa_data(db = Depends(get_db)):
+    """NEMISA progress for ALL participants."""
+    participants = db.query(Participant).all()
+    participant_data = []
+    total_assignments = 0
+    completed = 0
+    exams_passed = 0
+    
+    for p in participants:
+        assignments = db.query(NemisaAssignment).filter(NemisaAssignment.participant_id == p.participant_id).all()
+        courses = []
+        for a in assignments:
+            course = db.query(NemisaCourse).filter(NemisaCourse.code == a.course_code).first()
+            courses.append({
+                "course_name": course.name if course else a.course_code,
+                "progress": a.progress_pct or 0,
+                "status": a.status or "NOT STARTED",
+                "exam_passed": a.exam_passed
+            })
+            total_assignments += 1
+            if a.status == "COMPLETED": completed += 1
+            if a.exam_passed: exams_passed += 1
+            
+        avg_progress = round(sum(c["progress"] for c in courses) / len(courses), 1) if courses else 0
+        
+        participant_data.append({
+            "participant_id": p.participant_id,
+            "name": p.full_name,
+            "email": p.email,
+            "courses": courses,
+            "avg_progress": avg_progress,
+            "exams_passed": exams_passed # Simplified for display
+        })
+    
+    return {
+        "participants": participant_data,
+        "stats": {
+            "total_participants": len(participant_data),
+            "total_assignments": total_assignments,
+            "completed": completed,
+            "completion_rate": round((completed / total_assignments * 100), 1) if total_assignments > 0 else 0
+        }
+    }
+
+@app.get("/api/facilitator/ai-fluency")
+def facilitator_ai_data(db = Depends(get_db)):
+    """AI Fluency progress for ALL participants."""
+    participants = db.query(Participant).all()
+    participant_data = []
+    total_evidence = 0
+    
+    for p in participants:
+        records = db.query(AIFluencyProgress).filter(AIFluencyProgress.participant_id == p.participant_id).all()
+        modules_completed = sum(1 for r in records if r.completed)
+        evidence_count = sum(1 for r in records if r.evidence)
+        total_evidence += evidence_count
+        
+        participant_data.append({
+            "participant_id": p.participant_id,
+            "name": p.full_name,
+            "email": p.email,
+            "modules_completed": modules_completed,
+            "modules_total": 9,
+            "evidence_count": evidence_count,
+            "progress_pct": round((modules_completed / 9) * 100, 1)
+        })
+    
+    return {
+        "participants": participant_data,
+        "stats": {"total_participants": len(participant_data), "total_evidence_submissions": total_evidence}
+    }
+
+@app.get("/api/facilitator/l2l")
+def facilitator_l2l_data(db = Depends(get_db)):
+    """Learning to Learn progress for ALL participants."""
+    participants = db.query(Participant).all()
+    participant_data = []
+    total_score_sum = 0
+    total_max_sum = 0
+    
+    for p in participants:
+        records = db.query(L2LProgress).filter(L2LProgress.participant_id == p.participant_id).all()
+        modules_passed = sum(1 for r in records if r.completed)
+        total_score = sum(r.quiz_score or 0 for r in records)
+        total_max = sum(r.quiz_max or 0 for r in records)
+        
+        total_score_sum += total_score
+        total_max_sum += total_max
+        
+        avg_pct = round((total_score / total_max * 100), 1) if total_max > 0 else 0
+        
+        participant_data.append({
+            "participant_id": p.participant_id,
+            "name": p.full_name,
+            "email": p.email,
+            "modules_passed": modules_passed,
+            "modules_total": 8,
+            "average_pct": avg_pct,
+            "progress_pct": round((modules_passed / 8) * 100, 1)
+        })
+    
+    overall_avg = round((total_score_sum / total_max_sum * 100), 1) if total_max_sum > 0 else 0
+    
+    return {
+        "participants": participant_data,
+        "stats": {"total_participants": len(participant_data), "avg_score_across_all": overall_avg}
+    }
+
+@app.get("/api/facilitator/employment")
+def facilitator_employment_data(db = Depends(get_db)):
+    """Employment Readiness progress for ALL participants."""
+    participants = db.query(Participant).all()
+    participant_data = []
+    total_cvs = 0
+    total_apps = 0
+    total_reports = 0
+    
+    for p in participants:
+        records = db.query(EmploymentProgress).filter(EmploymentProgress.participant_id == p.participant_id).all()
+        modules_passed = sum(1 for r in records if r.completed)
+        
+        profile = db.query(EmploymentProfile).filter(
+            EmploymentProfile.participant_id == p.participant_id,
+            EmploymentProfile.profile_completed == True
+        ).first()
+        cv_built = profile is not None
+        if cv_built: total_cvs += 1
+        
+        apps = db.query(JobApplication).filter(JobApplication.participant_id == p.participant_id).count()
+        total_apps += apps
+        
+        reports = db.query(EmploymentWeeklyReport).filter(
+            EmploymentWeeklyReport.participant_id == p.participant_id,
+            EmploymentWeeklyReport.submitted == True
+        ).count()
+        total_reports += reports
+        
+        participant_data.append({
+            "participant_id": p.participant_id,
+            "name": p.full_name,
+            "email": p.email,
+            "modules_passed": modules_passed,
+            "modules_total": 14,
+            "cv_built": cv_built,
+            "applications_count": apps,
+            "weekly_reports": reports,
+            "progress_pct": round((modules_passed / 14) * 100, 1)
+        })
+    
+    return {
+        "participants": participant_data,
+        "stats": {
+            "total_participants": len(participant_data),
+            "cvs_built": total_cvs,
+            "total_applications": total_apps,
+            "total_weekly_reports": total_reports
+        }
+    }
+    
 @app.get("/init-db")
 def init_db(db = Depends(get_db)):
     # 1. Create all tables (including new ones like AIFluencyProgress, L2LProgress)
