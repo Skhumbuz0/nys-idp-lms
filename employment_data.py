@@ -276,14 +276,15 @@ EMPLOYMENT_MODULES = [
                 <h3>Applying is Not the End</h3>
                 <p>After submitting an application, record the date applied, employer, position, reference, closing date, follow-up date, and response.</p>
                 <p>The participant should follow the communication instructions provided by the employer and avoid excessive or inappropriate contact.</p>
-            """},
+                        """},
             {"number": "11.2", "title": "Follow-Up Record & Automation", "content_html": """
                 <h3>Follow-Up Record & Automation</h3>
-                <p><strong>Follow-Up Record:</strong> Employer, Position, Date applied, Expected communication date, Follow-up date, Method, Result, Next action.</p>
+                <p>After submitting an application, record the date applied, employer, position, reference, closing date, follow-up date, and response.</p>
+                <p>The participant should follow the communication instructions provided by the employer and avoid excessive or inappropriate contact.</p>
                 <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500 mt-4">
                     <h4 class="font-bold text-blue-800">LMS Automation</h4>
                     <p class="text-sm mt-2">The MAYO LMS will identify: IF application status = "Submitted" AND follow_up_date <= TODAY, THEN show "Follow-up due" dashboard notification.</p>
- “Follow-up Reminder: You applied for Administrative Assistant at ABC Company 7 days ago. Check the application status and follow up if appropriate.”
+                    <p class="text-sm mt-2 text-blue-700 italic">"Follow-up Reminder: You applied for Administrative Assistant at ABC Company 7 days ago. Check the application status and follow up if appropriate."</p>
                 </div>
             """}
         ],
@@ -377,7 +378,9 @@ EMPLOYMENT_MODULES = [
                     <li>30-Day Employment Action Plan</li>
                 </ol>
             """}
- “q”: “What is the purpose of the 30-day challenge?”, “options”: [“To demonstrate that the participant can apply the course skills in a real job search”, “To guarantee immediate employment”, “To replace the need for a CV”, “To rank participants against each other”], “correct”: 0}
+        ],
+        "quiz": [
+            {"q": "What is the purpose of the 30-day challenge?", "options": ["To demonstrate that the participant can apply the course skills in a real job search", "To guarantee immediate employment", "To replace the need for a CV", "To rank participants against each other"], "correct": 0}
         ]
     }
 ]
