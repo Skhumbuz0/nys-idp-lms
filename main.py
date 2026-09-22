@@ -300,7 +300,7 @@ CURRICULUM = {
     ], "action": "Send a message to your first Master Mind candidate today.", "reflection": "Why is mutual value critical in a Master Mind?"},
     20: {"week": 3, "title": "Make a Decision", "questions": [
         {"id": "dec_postpone", "type": "paragraph", "label": "What important decision have you been postponing, and why?"},
-        {"id": "dec_info", "type": "paragraph", "label": "What information do you still need?"},
+    {"id": "dec_info", "type": "paragraph", "label": "What information do you still need?"},
         {"id": "dec_final", "type": "paragraph", "label": "My decision is: __________"}
     ], "action": "Communicate your decision to the relevant person.", "reflection": "How does it feel to finally decide?"},
     21: {"week": 3, "title": "TAKE ACTION", "questions": [
@@ -1397,6 +1397,7 @@ async def submit_employment_quiz(module_code: str, request: Request, db = Depend
     max_score = len(module["quiz"])
     passed = (score / max_score) >= 0.8
     
+    # Save quiz progress
     progress = db.query(EmploymentProgress).filter(
         EmploymentProgress.participant_id == pid, 
         EmploymentProgress.module_code == module_code
@@ -1411,8 +1412,22 @@ async def submit_employment_quiz(module_code: str, request: Request, db = Depend
     progress.completed = passed
     db.commit()
     
+    # === NEW: Recalculate overall course progress and update Enrollment ===
+    all_progress = db.query(EmploymentProgress).filter(EmploymentProgress.participant_id == pid).all()
+    completed_count = sum(1 for p in all_progress if p.completed)
+    overall_pct = int((completed_count / len(EMPLOYMENT_MODULES)) * 100) if EMPLOYMENT_MODULES else 0
+    
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.participant_id == pid, 
+        Enrollment.course_code == "MAYO-EMPLOYMENT"
+    ).first()
+    
+    if enrollment:
+        enrollment.progress_pct = float(overall_pct)
+        db.commit()
+    # === END NEW ===
+    
     return RedirectResponse(url=f"/employment/module/{module_code}/quiz?result={'pass' if passed else 'fail'}&score={score}/{max_score}", status_code=303)
-
 
 # ==========================================
 # FACILITATOR & INIT ROUTES
