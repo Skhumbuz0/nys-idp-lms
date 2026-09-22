@@ -1637,7 +1637,40 @@ def facilitator_employment_data(db = Depends(get_db)):
             "total_weekly_reports": total_reports
         }
     }
+# ==========================================
+# FACILITATOR & INIT ROUTES
+# ==========================================
+@app.get("/facilitator", response_class=HTMLResponse)
+def facilitator_dashboard(request: Request, db = Depends(get_db)):
+    total = db.query(Participant).count()
+    completed = db.query(Participant).filter(Participant.final_idp_complete == True).count()
+    risk_counts = db.query(Participant.risk_status, func.count(Participant.id)).group_by(Participant.risk_status).all()
+    risk_dict = {status: count for status, count in risk_counts}
+    participants = db.query(Participant).all()
+    priority = {"At Risk": 1, "Needs Attention": 2, "Not Started": 3, "On Track": 4, "Completed": 5}
+    participants.sort(key=lambda x: priority.get(x.risk_status, 6))
+    return templates.TemplateResponse(request=request, name="facilitator_dashboard.html", context={"total": total, "completed": completed, "risk_dict": risk_dict, "participants": participants})
+
+@app.get("/api/facilitator/overview")
+def facilitator_overview(db = Depends(get_db)):
+    """High-level stats across all courses."""
+    total_participants = db.query(Participant).count()
     
+    # NYS IDP stats
+    idp_enrollments = db.query(Enrollment).filter(Enrollment.course_code == "NYS-IDP").all()
+    idp_completed = sum(1 for e in idp_enrollments if e.progress_pct >= 100)
+    idp_completion = round((idp_completed / len(idp_enrollments) * 100), 1) if idp_enrollments else 0
+    
+    # Employment CVs
+    cvs_built = db.query(EmploymentProfile).filter(EmploymentProfile.profile_completed == True).count()
+    
+    return {
+        "total_participants": total_participants,
+        "idp_completion": idp_completion,
+        "cvs_built": cvs_built
+    }
+
+
 @app.get("/init-db")
 def init_db(db = Depends(get_db)):
     # 1. Create all tables (including new ones like AIFluencyProgress, L2LProgress)
