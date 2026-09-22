@@ -1067,9 +1067,10 @@ async def save_cv_profile(
     
     db.commit()
     return RedirectResponse(url=f"/employment/cv-builder?saved=true&pid={pid}", status_code=303)
-
 @app.get("/employment/cv-builder/export")
 def export_cv_docx(request: Request, db = Depends(get_db)):
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    
     pid = request.query_params.get("pid", "")
     if not pid:
         return {"error": "Participant ID required"}
@@ -1080,37 +1081,93 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
     if not profile:
         return {"error": "Profile not found. Please fill out the CV builder first."}
 
-    # Generate Word Document
     doc = Document()
     
-    # 1. Header (Name & Contact)
-    name_para = doc.add_paragraph()
-    name_run = name_para.add_run(profile.professional_name or "Your Name")
-    name_run.font.size = Pt(24)
-    name_run.font.bold = True
-    name_run.font.color.rgb = RGBColor(0, 51, 102) # Dark Blue
-    name_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Adjust margins for a professional, compact look
+    for section in doc.sections:
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
+        section.left_margin = Inches(0.75)
+        section.right_margin = Inches(0.75)
+
+    # --- HEADER WITH PHOTO (2-Column Table) ---
+    header_table = doc.add_table(rows=1, cols=2)
+    header_table.alignment = WD_TABLE_ALIGNMENT.CENTER
     
-    contact_para = doc.add_paragraph()
+    # Left cell: Name and Contact
+    cell_left = header_table.cell(0, 0)
+    name_para = cell_left.paragraphs[0]
+    name_run = name_para.add_run((profile.professional_name or "YOUR NAME").upper())
+    name_run.font.size = Pt(22)
+    name_run.font.bold = True
+    name_run.font.color.rgb = RGBColor(0, 51, 102) # Professional Dark Blue
+    
+    contact_para = cell_left.add_paragraph()
     contact_run = contact_para.add_run(f"📞 {profile.phone or ''} | 📧 {profile.professional_email or ''} | 📍 {profile.city or ''}, {profile.province or ''}")
     contact_run.font.size = Pt(11)
-    contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Right cell: Photo
+    cell_right = header_table.cell(0, 1)
+    cell_right.width = Inches(1.5)
+    if profile.photo_path:
+        # Convert web path (/static/uploads/...) to absolute server path
+        abs_photo_path = os.path.join(os.getcwd(), profile.photo_path.lstrip('/'))
+        if os.path.exists(abs_photo_path):
+            pic_para = cell_right.paragraphs[0]
+            pic_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            try:
+                pic_para.add_picture(abs_photo_path, width=Inches(1.2))
+            except Exception as e:
+                print(f"Error adding picture: {e}")
+
     doc.add_paragraph() # Spacer
 
-    # Helper function for sections
-    def add_section_heading(title):
-        h = doc.add_heading(title, level=2)
-        h.runs[0].font.color.rgb = RGBColor(0, 51, 102)
-        h.runs[0].font.bold = True
+    # Helper function for consistent section headings
+    def add_heading(title):
+        h = doc.add_heading(title.upper(), level=2)
+        h.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        for run in h.runs:
+            run.font.size = Pt(12)
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(0, 51, 102)
         doc.add_paragraph()
 
-    # 2. Profile
+    # --- PROFILE ---
     if profile.professional_profile:
-        add_section_heading("PROFILE")
-        doc.add_paragraph(profile.professional_profile)
+        add_heading("PROFILE")
+        p = doc.add_paragraph(profile.professional_profile)
+        for run in p.runs:
+            run.font.size = Pt(11)
 
-    # 3. Personal Details
-    add_section_heading("PERSONAL DETAILS")
+    # --- CORE COMPETENCIES ---
+    if profile.core_competencies:
+        add_heading("CORE COMPETENCIES")
+        for item in profile.core_competencies.split('\n'):
+            if item.strip():
+                p = doc.add_paragraph(item.strip(), style='List Bullet')
+                for run in p.runs:
+                    run.font.size = Pt(11)
+
+    # --- CERTIFICATIONS ---
+    if profile.certifications:
+        add_heading("CERTIFICATIONS")
+        for item in profile.certifications.split('\n'):
+            if item.strip():
+                p = doc.add_paragraph(item.strip(), style='List Bullet')
+                for run in p.runs:
+                    run.font.size = Pt(11)
+
+    # --- SKILLS ---
+    if profile.skills:
+        add_heading("SKILLS")
+        for item in profile.skills.split('\n'):
+            if item.strip():
+                p = doc.add_paragraph(item.strip(), style='List Bullet')
+                for run in p.runs:
+                    run.font.size = Pt(11)
+
+    # --- PERSONAL DETAILS ---
+    add_heading("PERSONAL DETAILS")
     details_table = doc.add_table(rows=6, cols=2)
     details_table.style = 'Normal Table'
     details_data = [
@@ -1122,59 +1179,42 @@ def export_cv_docx(request: Request, db = Depends(get_db)):
         ("Criminal Record", profile.criminal_record or "None")
     ]
     for i, (label, value) in enumerate(details_data):
-        details_table.rows[i].cells[0].text = label
-        details_table.rows[i].cells[0].paragraphs[0].runs[0].font.bold = True
-        details_table.rows[i].cells[1].text = value
-
+        row = details_table.rows[i]
+        row.cells[0].text = f"{label}:"
+        row.cells[0].paragraphs[0].runs[0].font.bold = True
+        row.cells[0].width = Inches(1.5)
+        row.cells[1].text = value
     doc.add_paragraph()
 
-    # 4. Core Competencies
-    if profile.core_competencies:
-        add_section_heading("CORE COMPETENCIES")
-        for item in profile.core_competencies.split('\n'):
-            if item.strip():
-                doc.add_paragraph(item.strip(), style='List Bullet')
+    # --- EDUCATION ---
+    add_heading("EDUCATION")
+    p = doc.add_paragraph()
+    p.add_run("National Senior Certificate (Grade 12)\n").bold = True
+    p.add_run("King Makhosonke II Secondary School (2024)").italic = True
+    doc.add_paragraph()
 
-    # 5. Certifications
-    if profile.certifications:
-        add_section_heading("CERTIFICATIONS")
-        for item in profile.certifications.split('\n'):
-            if item.strip():
-                doc.add_paragraph(item.strip(), style='List Bullet')
-
-    # 6. Skills
-    if profile.skills:
-        add_section_heading("SKILLS")
-        for item in profile.skills.split('\n'):
-            if item.strip():
-                doc.add_paragraph(item.strip(), style='List Bullet')
-
-    # 7. Education (Simplified for now, can be expanded)
-    add_section_heading("EDUCATION")
-    doc.add_paragraph("National Senior Certificate (Grade 12)", style='List Bullet')
-    doc.add_paragraph("King Makhosonke II Secondary School (2024)", style='List Bullet')
-
-    # 8. Work Experience
-    add_section_heading("WORK EXPERIENCE")
+    # --- WORK EXPERIENCE ---
+    add_heading("WORK EXPERIENCE")
     for exp in experiences:
         p = doc.add_paragraph()
         p.add_run(f"{exp.position or 'Role'}\n").bold = True
         p.add_run(f"{exp.organisation or 'Organisation'} | {exp.start_date or 'Start'} – {exp.end_date or 'Present'}\n").italic = True
         
-        # Split description by newlines for bullet points
         for line in exp.description.split('\n'):
             if line.strip():
-                doc.add_paragraph(line.strip(), style='List Bullet')
+                # Clean up any manual bullet characters the user might have pasted
+                clean_line = line.strip().lstrip('•-–*')
+                doc.add_paragraph(clean_line, style='List Bullet')
         doc.add_paragraph()
 
-    # 9. References
+    # --- REFERENCES ---
     if profile.references:
-        add_section_heading("REFERENCES")
+        add_heading("REFERENCES")
         for ref in profile.references.split('\n'):
             if ref.strip():
                 doc.add_paragraph(ref.strip())
 
-    # Save to temporary file
+    # Save and return
     filename = f"{profile.professional_name.replace(' ', '_')}_CV.docx"
     filepath = f"{UPLOAD_DIR}/{filename}"
     doc.save(filepath)
