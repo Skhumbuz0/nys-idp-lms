@@ -63,6 +63,7 @@ async function loadTabData(tabName) {
 
 function renderTabContent(tabName, data) {
     const container = document.getElementById(`${tabName}-content`);
+    
     if (tabName === 'overview') {
         container.innerHTML = `
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -87,7 +88,7 @@ function renderTabContent(tabName, data) {
                 <h3 class="text-xl font-bold mb-4">Welcome to the Facilitator Dashboard</h3>
                 <p class="text-gray-700">Click on the tabs above to view detailed, participant-by-participant progress for each specific course. The Overview tab provides high-level statistics across the entire MAYO programme.</p>
             </div>`;
-        } else if (tabName === 'idp') {
+    } else if (tabName === 'idp') {
         container.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow">
                 <h3 class="text-xl font-bold mb-4">📘 NYS IDP: 30-Day Challenge Progress</h3>
@@ -96,6 +97,7 @@ function renderTabContent(tabName, data) {
                     <table class="w-full text-sm">
                         <thead class="bg-gray-100">
                             <tr>
+                                <th class="p-3 text-left">Participant ID</th>
                                 <th class="p-3 text-left">Participant</th>
                                 <th class="p-3 text-left">Email</th>
                                 <th class="p-3 text-center">Progress</th>
@@ -110,6 +112,7 @@ function renderTabContent(tabName, data) {
                         <tbody>
                             ${(data.participants || []).map(p => `
                                 <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 font-mono text-xs text-blue-700 font-bold">${p.participant_id}</td>
                                     <td class="p-3 font-semibold">${p.name}</td>
                                     <td class="p-3 text-gray-600 text-xs">${p.email}</td>
                                     <td class="p-3 text-center">
@@ -140,7 +143,7 @@ function renderTabContent(tabName, data) {
                     </table>
                 </div>
             </div>`;
-        } else if (tabName === 'nemisa') {
+    } else if (tabName === 'nemisa') {
         container.innerHTML = `
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500"><p class="text-sm text-gray-500 font-bold">Participants</p><p class="text-3xl font-bold">${data.stats.total_participants}</p></div>
@@ -152,10 +155,11 @@ function renderTabContent(tabName, data) {
                 <h3 class="text-xl font-bold mb-4">💻 NEMISA Digital Skills Progress</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-left">Courses</th><th class="p-3 text-center">Avg Progress</th></tr></thead>
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant ID</th><th class="p-3 text-left">Participant</th><th class="p-3 text-left">Courses</th><th class="p-3 text-center">Avg Progress</th></tr></thead>
                         <tbody>
                             ${data.participants.map(p => `
                                 <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 font-mono text-xs text-blue-700 font-bold">${p.participant_id}</td>
                                     <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
                                     <td class="p-3 text-xs">${p.courses.length > 0 ? p.courses.map(c => c.course_name).join(', ') : 'Not started'}</td>
                                     <td class="p-3 text-center">
@@ -179,10 +183,11 @@ function renderTabContent(tabName, data) {
                 <h3 class="text-xl font-bold mb-4">🤖 MAYO AI Fluency Progress</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules</th><th class="p-3 text-center">Evidence</th><th class="p-3 text-center">Progress</th></tr></thead>
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant ID</th><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules</th><th class="p-3 text-center">Evidence</th><th class="p-3 text-center">Progress</th></tr></thead>
                         <tbody>
                             ${data.participants.map(p => `
                                 <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 font-mono text-xs text-blue-700 font-bold">${p.participant_id}</td>
                                     <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
                                     <td class="p-3 text-center">${p.modules_completed} / ${p.modules_total}</td>
                                     <td class="p-3 text-center font-bold text-indigo-700">${p.evidence_count}</td>
@@ -207,10 +212,11 @@ function renderTabContent(tabName, data) {
                 <h3 class="text-xl font-bold mb-4">🧠 MAYO Learning to Learn Progress</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules Passed</th><th class="p-3 text-center">Avg Score</th><th class="p-3 text-center">Progress</th></tr></thead>
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant ID</th><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules Passed</th><th class="p-3 text-center">Avg Score</th><th class="p-3 text-center">Progress</th></tr></thead>
                         <tbody>
                             ${data.participants.map(p => `
                                 <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 font-mono text-xs text-blue-700 font-bold">${p.participant_id}</td>
                                     <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
                                     <td class="p-3 text-center">${p.modules_passed} / ${p.modules_total}</td>
                                     <td class="p-3 text-center font-bold text-orange-700">${p.average_pct}%</td>
@@ -236,10 +242,11 @@ function renderTabContent(tabName, data) {
                 <h3 class="text-xl font-bold mb-4">💼 MAYO Employment Readiness Progress</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules</th><th class="p-3 text-center">CV Built</th><th class="p-3 text-center">Apps</th><th class="p-3 text-center">Reports</th><th class="p-3 text-center">Progress</th></tr></thead>
+                        <thead class="bg-gray-100"><tr><th class="p-3 text-left">Participant ID</th><th class="p-3 text-left">Participant</th><th class="p-3 text-center">Modules</th><th class="p-3 text-center">CV Built</th><th class="p-3 text-center">Apps</th><th class="p-3 text-center">Reports</th><th class="p-3 text-center">Progress</th></tr></thead>
                         <tbody>
                             ${data.participants.map(p => `
                                 <tr class="border-t hover:bg-gray-50">
+                                    <td class="p-3 font-mono text-xs text-blue-700 font-bold">${p.participant_id}</td>
                                     <td class="p-3"><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.email}</div></td>
                                     <td class="p-3 text-center">${p.modules_passed} / ${p.modules_total}</td>
                                     <td class="p-3 text-center">${p.cv_built ? '<span class="text-green-600 font-bold">✅</span>' : '<span class="text-gray-400">❌</span>'}</td>
