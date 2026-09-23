@@ -1452,16 +1452,24 @@ def facilitator_overview(db = Depends(get_db)):
 
 @app.get("/api/facilitator/idp")
 def facilitator_idp_data(db = Depends(get_db)):
-    """Original NYS IDP 30-Day Challenge view for ALL participants."""
+    """NYS IDP 30-Day Challenge view with actual quiz scores for ALL participants."""
     participants = db.query(Participant).all()
     participant_data = []
     
     for p in participants:
-        enrollment = db.query(Enrollment).filter(
-            Enrollment.participant_id == p.participant_id,
-            Enrollment.course_code == "NYS-IDP"
-        ).first()
-        progress = round(enrollment.progress_pct, 1) if enrollment else round(p.overall_progress_pct, 1)
+        # Fetch actual quiz scores for this participant
+        quizzes = db.query(QuizResponse).filter(QuizResponse.participant_id == p.participant_id).all()
+        quiz_scores = {q.week: round(q.percentage, 1) for q in quizzes}
+        
+        # Calculate progress: use overall_progress_pct, but if it's 0, calculate from completed weeks
+        progress = round(p.overall_progress_pct, 1) if p.overall_progress_pct else 0.0
+        
+        if progress == 0.0:
+            weeks_done = sum([1 for w in [p.week1_complete, p.week2_complete, p.week3_complete, p.week4_complete] if w])
+            if p.final_idp_complete:
+                progress = 100.0
+            elif weeks_done > 0:
+                progress = round((weeks_done / 4) * 100, 1)
         
         participant_data.append({
             "participant_id": p.participant_id,
@@ -1470,10 +1478,10 @@ def facilitator_idp_data(db = Depends(get_db)):
             "progress_pct": progress,
             "risk_status": p.risk_status or "Not Started",
             "last_activity": p.last_activity.strftime("%Y-%m-%d") if p.last_activity else "Never",
-            "week1": p.week1_complete,
-            "week2": p.week2_complete,
-            "week3": p.week3_complete,
-            "week4": p.week4_complete
+            "week1_score": quiz_scores.get(1, 0),
+            "week2_score": quiz_scores.get(2, 0),
+            "week3_score": quiz_scores.get(3, 0),
+            "week4_score": quiz_scores.get(4, 0)
         })
     
     return {"participants": participant_data, "total_participants": len(participant_data)}

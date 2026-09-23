@@ -87,7 +87,7 @@ function renderTabContent(tabName, data) {
                 <h3 class="text-xl font-bold mb-4">Welcome to the Facilitator Dashboard</h3>
                 <p class="text-gray-700">Click on the tabs above to view detailed, participant-by-participant progress for each specific course. The Overview tab provides high-level statistics across the entire MAYO programme.</p>
             </div>`;
-    } else if (tabName === 'idp') {
+        } else if (tabName === 'idp') {
         container.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow">
                 <h3 class="text-xl font-bold mb-4">📘 NYS IDP: 30-Day Challenge Progress</h3>
@@ -99,10 +99,10 @@ function renderTabContent(tabName, data) {
                                 <th class="p-3 text-left">Participant</th>
                                 <th class="p-3 text-left">Email</th>
                                 <th class="p-3 text-center">Progress</th>
-                                <th class="p-3 text-center">W1</th>
-                                <th class="p-3 text-center">W2</th>
-                                <th class="p-3 text-center">W3</th>
-                                <th class="p-3 text-center">W4</th>
+                                <th class="p-3 text-center">Week 1 Quiz</th>
+                                <th class="p-3 text-center">Week 2 Quiz</th>
+                                <th class="p-3 text-center">Week 3 Quiz</th>
+                                <th class="p-3 text-center">Week 4 Quiz</th>
                                 <th class="p-3 text-center">Risk Status</th>
                                 <th class="p-3 text-center">Last Activity</th>
                             </tr>
@@ -113,14 +113,26 @@ function renderTabContent(tabName, data) {
                                     <td class="p-3 font-semibold">${p.name}</td>
                                     <td class="p-3 text-gray-600 text-xs">${p.email}</td>
                                     <td class="p-3 text-center">
-                                        <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-purple-600 h-2 rounded-full" style="width: ${p.progress_pct}%"></div></div>
-                                        <span class="text-xs">${p.progress_pct}%</span>
+                                        <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                                            <div class="bg-purple-600 h-2 rounded-full" style="width: ${p.progress_pct}%"></div>
+                                        </div>
+                                        <span class="text-xs font-bold">${p.progress_pct}%</span>
                                     </td>
-                                    <td class="p-3 text-center">${p.week1 ? '✅' : '⬜'}</td>
-                                    <td class="p-3 text-center">${p.week2 ? '✅' : '⬜'}</td>
-                                    <td class="p-3 text-center">${p.week3 ? '✅' : '⬜'}</td>
-                                    <td class="p-3 text-center">${p.week4 ? '✅' : '⬜'}</td>
-                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-bold ${getRiskColor(p.risk_status)}">${p.risk_status}</span></td>
+                                    <td class="p-3 text-center text-xs font-semibold ${p.week1_score > 0 ? 'text-green-600' : 'text-gray-400'}">
+                                        ${p.week1_score > 0 ? p.week1_score + '%' : 'Not Taken'}
+                                    </td>
+                                    <td class="p-3 text-center text-xs font-semibold ${p.week2_score > 0 ? 'text-green-600' : 'text-gray-400'}">
+                                        ${p.week2_score > 0 ? p.week2_score + '%' : 'Not Taken'}
+                                    </td>
+                                    <td class="p-3 text-center text-xs font-semibold ${p.week3_score > 0 ? 'text-green-600' : 'text-gray-400'}">
+                                        ${p.week3_score > 0 ? p.week3_score + '%' : 'Not Taken'}
+                                    </td>
+                                    <td class="p-3 text-center text-xs font-semibold ${p.week4_score > 0 ? 'text-green-600' : 'text-gray-400'}">
+                                        ${p.week4_score > 0 ? p.week4_score + '%' : 'Not Taken'}
+                                    </td>
+                                    <td class="p-3 text-center">
+                                        <span class="px-2 py-1 rounded text-xs font-bold ${getRiskColor(p.risk_status)}">${p.risk_status}</span>
+                                    </td>
                                     <td class="p-3 text-center text-xs">${p.last_activity}</td>
                                 </tr>
                             `).join('')}
@@ -128,7 +140,7 @@ function renderTabContent(tabName, data) {
                     </table>
                 </div>
             </div>`;
-    } else if (tabName === 'nemisa') {
+        } else if (tabName === 'nemisa') {
         container.innerHTML = `
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-500"><p class="text-sm text-gray-500 font-bold">Participants</p><p class="text-3xl font-bold">${data.stats.total_participants}</p></div>
